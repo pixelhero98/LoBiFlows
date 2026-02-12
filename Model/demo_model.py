@@ -5,9 +5,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# ==========================================
-# 2. The Model (BiFlow)
-# ==========================================
+
 class BiFlowLOB(nn.Module):
     def __init__(self, config):
         super().__init__()
