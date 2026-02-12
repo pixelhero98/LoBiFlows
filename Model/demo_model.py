@@ -30,35 +30,56 @@ class BiFlowLOB(nn.Module):
         v = net(torch.cat([x, t, context], dim=1))
         return x + v * dt
 
+    import torch
+import torch.nn as nn
+from scipy.optimize import linear_sum_assignment # For Optimal Transport
+
+class BiFlowLOB(nn.Module):
+    # ... (Init remains the same) ...
+
     def compute_loss(self, x_real, history):
-        context = self.get_context(history)
+        context = self.context_encoder(history)
+        batch_size = x_real.shape[0]
+
+        # --- 1. OT PAIRING (The "MeanFlow" style) ---
+        # Sample random noise
+        z_random = torch.randn_like(x_real)
+
+        # Detach for OT calculation (we don't differentiate through the sorting)
+        x_flat = x_real.view(batch_size, -1).detach().cpu()
+        z_flat = z_random.view(batch_size, -1).detach().cpu()
+
+        # Calculate Cost Matrix (Euclidean Distance squared)
+        # We want to match x[i] with the z[j] that is closest to it
+        dist_matrix = torch.cdist(x_flat, z_flat, p=2) ** 2
         
-        # Define loss functions
-        loss_l1 = nn.SmoothL1Loss() # Precision (Peak)
-        loss_l2 = nn.MSELoss()      # Volatility (Tails)
+        # Hungarian Algorithm to find optimal pairs (Minimize total distance)
+        row_ind, col_ind = linear_sum_assignment(dist_matrix.numpy())
         
-        # --- 1. Generator Loss (Velocity Matching) ---
-        z = torch.randn_like(x_real)
-        t = torch.rand(x_real.shape[0], 1).to(x_real.device)
-        x_t = (1 - t) * z + t * x_real
+        # Reorder Z to match X optimally
+        z_aligned = z_random[col_ind].to(x_real.device)
+
+        # --- 2. Generator Loss (Velocity Matching) ---
+        # Now we regress the path from z_aligned -> x_real
+        # This path is statistically much "straighter" than random pairing
+        t = torch.rand(batch_size, 1).to(x_real.device)
+        x_t = (1 - t) * z_aligned + t * x_real
         
         v_pred = self.generator_flow(torch.cat([x_t, t, context], dim=1))
-        target_v = x_real - z
-        
-        # Mix: L1 + L2 objective
-        loss_gen_l1 = loss_l1(v_pred, target_v)
-        loss_gen_l2 = loss_l2(v_pred, target_v)
-        loss_gen = (0.82 * loss_gen_l1) + (0.18 * loss_gen_l2)
-        
-        # --- 2. Cycle Loss (Consistency) ---
+        target_v = x_real - z_aligned # Vector points to target
+
+        # Mixed Loss (75% L1, 25% MSE)
+        loss_l1 = nn.SmoothL1Loss()
+        loss_l2 = nn.MSELoss()
+        loss_gen = 0.75 * loss_l1(v_pred, target_v) + 0.25 * loss_l2(v_pred, target_v)
+
+        # --- 3. Cycle Loss (BiFlow Consistency) ---
+        # We use the Generator (trained with OT) to check consistency
         z_pred = self.flow_step(self.encoder_flow, x_real, context)
         x_recon = self.flow_step(self.generator_flow, z_pred, context)
         
-        # Mix for Cycle as well
-        loss_cycle_l1 = loss_l1(x_real, x_recon)
-        loss_cycle_l2 = loss_l2(x_real, x_recon)
-        loss_cycle = (0.82 * loss_cycle_l1) + (0.18 * loss_cycle_l2)
-        
+        loss_cycle = 0.75 * loss_l1(x_real, x_recon) + 0.25 * loss_l2(x_real, x_recon)
+
         return loss_gen + (LOBConfig.lambda_cycle * loss_cycle)
 
     @torch.no_grad()
