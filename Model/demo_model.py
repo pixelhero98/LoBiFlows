@@ -1,5 +1,4 @@
-"""demo_model.py
-
+"""
 Generative models for *Level-2* (L2) limit order book (LOB) snapshot sequences.
 
 What's in here
