@@ -1,24 +1,39 @@
-"""
+"""demo_model_bimean_std.py
+
+demo_model_bimean_std.py
+
 Generative models for *Level-2* (L2) limit order book (LOB) snapshot sequences.
 
-What's in here
---------------
-1) A validity-by-construction feature map that converts between:
-   - raw L2 snapshots (prices/volumes at L levels on bid/ask), and
-   - an unconstrained parameter vector (dim = 4L) that *always* decodes to a valid L2 book.
+Key design choices (stability-focused)
+--------------------------------------
+- L2FeatureMap: validity-by-construction representation (monotone ladders, positive spread/sizes).
+- BiFlowLOB: rectified-flow / flow-matching baseline (multi-step Euler sampler).
+- BiMeanFlowLOB: BiFlow + MeanFlow hybrid (paired x<->z + 1-step sampling).
 
-2) Two generators:
-   - BiFlowLOB: a rectified-flow / flow-matching baseline (multi-step sampler)
-   - BiMeanFlowLOB: a BiFlow + MeanFlow hybrid:
-        * Forward net f_psi: maps x -> z (paired data/noise, no OT matching)
-        * Reverse net u_theta: predicts a *mean displacement* so generation can be 1-step:
-              x ≈ z + u_theta(z, t=0, ctx)
-        * Cycle & prior losses stabilize training and keep z ~ N(0,I)
+Stability fixes
+---------------
+- MeanFlow loss is implemented for the *linear* path:
+      x_t = (1-t) z + t x
+      u_target = x - z
+  aligned with 1-step sampling:
+      x ≈ z + u(z, t=0)
 
-3) Dataset helpers:
-   - FI-2010-like array loader (public benchmark; 10 levels -> 40 raw features)
-   - ABIDES L2 snapshot loader (npz with bids/asks arrays)
-   - A built-in synthetic L2 generator for quick sanity checks / ablations
+- Output LayerNorm is disabled for generator heads (f_net/u_net/v_net).
+
+Automatic standardization (Mode A)
+----------------------------------
+All dataset builders standardize the parameter vectors by default:
+
+    x_norm = (x - mu) / (sigma + eps)
+
+The returned dataset stores (mu, sigma) and provides:
+    ds.denorm(x_norm) -> x_raw
+    ds.norm(x_raw)    -> x_norm
+
+This is strongly recommended because decode_sequence() exponentiates log-values
+(spread/gaps/sizes), so small errors in raw scale can explode.
+
+
 """
 
 from __future__ import annotations
@@ -26,7 +41,7 @@ from __future__ import annotations
 import math
 import os
 from dataclasses import dataclass
-from typing import Dict, Optional, Tuple
+from typing import Dict, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -34,9 +49,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-# -----------------------------
-# Config
-# -----------------------------
+ArrayLike = Union[np.ndarray, torch.Tensor]
+
 
 @dataclass
 class LOBConfig:
@@ -48,7 +62,6 @@ class LOBConfig:
     hidden_dim: int = 128
     num_layers: int = 1
     dropout: float = 0.1
-    layer_norm: bool = True
 
     # Training
     batch_size: int = 64
@@ -66,26 +79,24 @@ class LOBConfig:
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
     # -------- BiMeanFlow losses (hybrid model) --------
-    # Main MeanFlow displacement loss
     lambda_mean: float = 1.0
-    # Reconstruct x via one-step z->x using u_theta at t=0
     lambda_xrec: float = 1.0
-    # Cycle in latent space (z -> x_fake -> z_rec)
     lambda_zcycle: float = 0.25
-    # Encourage z_hat to match N(0, I) moments
     lambda_prior: float = 0.1
 
-    # MeanFlow path: "linear" or "cosine"
-    path: str = "cosine"
+    # MeanFlow path: implemented for linear only in this file
+    path: str = "linear"
+
+    # Optional: clip generated normalized params to limit AR drift (0 disables)
+    sample_clip: float = 0.0
+
+    # Dataset standardization (Mode A): standardize in builders
+    standardize: bool = True
 
     @property
     def state_dim(self) -> int:
         return 4 * self.levels
 
-
-# -----------------------------
-# Feature map: valid L2 <-> unconstrained params
-# -----------------------------
 
 class L2FeatureMap:
     """Encode/decode between raw L2 snapshots and an unconstrained vector.
@@ -113,34 +124,25 @@ class L2FeatureMap:
         bid_p: np.ndarray,
         bid_v: np.ndarray,
     ) -> Tuple[np.ndarray, np.ndarray]:
-        """Return (params, mids).
-
-        params: [T, 4L]
-        mids:   [T]
-        """
         T, L = ask_p.shape
         assert L == self.L
         assert ask_v.shape == (T, L)
         assert bid_p.shape == (T, L)
         assert bid_v.shape == (T, L)
 
-        # mid and spread
         mid = 0.5 * (ask_p[:, 0] + bid_p[:, 0])
         spread = np.clip(ask_p[:, 0] - bid_p[:, 0], self.eps, None)
         log_spread = np.log(spread)
 
-        # delta mid (first is 0)
         delta_mid = np.zeros(T, dtype=np.float32)
         if T > 1:
             delta_mid[1:] = (mid[1:] - mid[:-1]).astype(np.float32)
 
-        # gaps (positive)
         ask_gaps = np.clip(ask_p[:, 1:] - ask_p[:, :-1], self.eps, None)
         bid_gaps = np.clip(bid_p[:, :-1] - bid_p[:, 1:], self.eps, None)
         log_ask_gaps = np.log(ask_gaps)
         log_bid_gaps = np.log(bid_gaps)
 
-        # sizes (positive)
         ask_v = np.clip(ask_v, self.eps, None)
         bid_v = np.clip(bid_v, self.eps, None)
         log_ask_v = np.log(ask_v)
@@ -168,8 +170,7 @@ class L2FeatureMap:
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
         """Decode params -> valid L2 snapshot sequence.
 
-        params: [T, 4L]
-        Returns: (ask_p, ask_v, bid_p, bid_v, mids)
+        params must be in RAW scale (not standardized).
         """
         T, D = params.shape
         L = self.L
@@ -207,11 +208,8 @@ class L2FeatureMap:
 
         return ask_p, ask_v.astype(np.float32), bid_p, bid_v.astype(np.float32), mids
 
-    # ---------- FI-2010 helpers ----------
-
     @staticmethod
     def _split_interleaved(x: np.ndarray, L: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """[ask_p1, ask_v1, bid_p1, bid_v1, ask_p2, ...]"""
         ask_p = x[:, 0::4][:, :L]
         ask_v = x[:, 1::4][:, :L]
         bid_p = x[:, 2::4][:, :L]
@@ -220,7 +218,6 @@ class L2FeatureMap:
 
     @staticmethod
     def _split_blocks(x: np.ndarray, L: int) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """[ask_p(1..L), ask_v(1..L), bid_p(1..L), bid_v(1..L)]"""
         ask_p = x[:, :L]
         ask_v = x[:, L : 2 * L]
         bid_p = x[:, 2 * L : 3 * L]
@@ -240,13 +237,6 @@ class L2FeatureMap:
         x: np.ndarray,
         layout: str = "auto",
     ) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Split a 2D array into (ask_p, ask_v, bid_p, bid_v).
-
-        layout:
-          - "interleaved"  : [ask_p1, ask_v1, bid_p1, bid_v1, ask_p2, ...]
-          - "blocks"       : [ask_p(1..L), ask_v(1..L), bid_p(1..L), bid_v(1..L)]
-          - "auto"         : pick the one with best validity ratio
-        """
         assert x.ndim == 2 and x.shape[1] >= 4 * self.L
         x40 = x[:, : 4 * self.L]
 
@@ -264,12 +254,37 @@ class L2FeatureMap:
         return a1 if r1 >= r2 else a2
 
 
-# -----------------------------
-# Datasets
-# -----------------------------
+def standardize_params(params: np.ndarray, eps: float = 1e-6) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """Return (params_norm, mu, sigma)."""
+    mu = params.mean(axis=0).astype(np.float32)
+    sigma = params.std(axis=0).astype(np.float32)
+    sigma = np.maximum(sigma, eps).astype(np.float32)
+    params_norm = ((params - mu) / sigma).astype(np.float32)
+    return params_norm, mu, sigma
+
+
+def _apply_affine(x: ArrayLike, mu: np.ndarray, sigma: np.ndarray, inverse: bool) -> ArrayLike:
+    if isinstance(x, np.ndarray):
+        if inverse:
+            return (x * sigma[None, :] + mu[None, :]).astype(np.float32)
+        return ((x - mu[None, :]) / sigma[None, :]).astype(np.float32)
+
+    if not torch.is_tensor(x):
+        raise TypeError(f"Unsupported type: {type(x)}")
+
+    mu_t = torch.from_numpy(mu).to(x.device, dtype=x.dtype)
+    sig_t = torch.from_numpy(sigma).to(x.device, dtype=x.dtype)
+    if inverse:
+        return x * sig_t + mu_t
+    return (x - mu_t) / sig_t
+
 
 class WindowedLOBParamsDataset(torch.utils.data.Dataset):
-    """Takes a long params sequence and yields (history, target, meta)."""
+    """Takes a long params sequence and yields (history, target, meta).
+
+    If standardized, the dataset returns normalized params and stores mu/sigma.
+    Use ds.denorm(x) before decoding to L2.
+    """
 
     def __init__(
         self,
@@ -278,17 +293,37 @@ class WindowedLOBParamsDataset(torch.utils.data.Dataset):
         history_len: int,
         stride: int = 1,
         cond: Optional[np.ndarray] = None,
+        params_mean: Optional[np.ndarray] = None,
+        params_std: Optional[np.ndarray] = None,
     ):
         assert params.ndim == 2
         assert mids.ndim == 1
         assert len(params) == len(mids)
-        self.params = params
-        self.mids = mids
+
+        self.params = params.astype(np.float32)
+        self.mids = mids.astype(np.float32)
         self.H = int(history_len)
         self.stride = int(stride)
         self.cond = cond
 
+        self.params_mean = params_mean.astype(np.float32) if params_mean is not None else None
+        self.params_std = params_std.astype(np.float32) if params_std is not None else None
+
         self.start_indices = np.arange(self.H, len(params), self.stride)
+
+    @property
+    def is_standardized(self) -> bool:
+        return (self.params_mean is not None) and (self.params_std is not None)
+
+    def norm(self, x_raw: ArrayLike) -> ArrayLike:
+        if not self.is_standardized:
+            return x_raw
+        return _apply_affine(x_raw, self.params_mean, self.params_std, inverse=False)
+
+    def denorm(self, x_norm: ArrayLike) -> ArrayLike:
+        if not self.is_standardized:
+            return x_norm
+        return _apply_affine(x_norm, self.params_mean, self.params_std, inverse=True)
 
     def __len__(self) -> int:
         return len(self.start_indices)
@@ -308,23 +343,12 @@ class WindowedLOBParamsDataset(torch.utils.data.Dataset):
 
 
 def load_fi2010_like_array(path: str) -> np.ndarray:
-    """Load a FI-2010-like array.
-
-    Supports:
-      - .npy (2D array)
-      - .npz (expects 'data' or first array)
-      - .csv (numeric)
-    """
     ext = os.path.splitext(path)[1].lower()
     if ext == ".npy":
         x = np.load(path)
     elif ext == ".npz":
         z = np.load(path)
-        if "data" in z:
-            x = z["data"]
-        else:
-            k0 = list(z.keys())[0]
-            x = z[k0]
+        x = z["data"] if "data" in z else z[list(z.keys())[0]]
     elif ext in (".csv", ".txt"):
         x = np.loadtxt(path, delimiter=",")
     else:
@@ -335,13 +359,6 @@ def load_fi2010_like_array(path: str) -> np.ndarray:
 
 
 def load_abides_l2_npz(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Load ABIDES L2 snapshots exported as npz.
-
-    Expected keys:
-      - times: [T] (optional)
-      - bids:  [T, L, 2] where [:,:,0]=price, [:,:,1]=size
-      - asks:  [T, L, 2] where [:,:,0]=price, [:,:,1]=size
-    """
     z = np.load(path, allow_pickle=True)
     bids = z["bids"].astype(np.float32)
     asks = z["asks"].astype(np.float32)
@@ -349,24 +366,21 @@ def load_abides_l2_npz(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
     return times, bids, asks
 
 
-def build_dataset_from_fi2010(
-    path: str,
-    cfg: LOBConfig,
-    layout: str = "auto",
-    stride: int = 1,
-) -> WindowedLOBParamsDataset:
+def build_dataset_from_fi2010(path: str, cfg: LOBConfig, layout: str = "auto", stride: int = 1) -> WindowedLOBParamsDataset:
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     x = load_fi2010_like_array(path)
     ask_p, ask_v, bid_p, bid_v = fm.split_l2_from_array(x, layout=layout)
-    params, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
-    return WindowedLOBParamsDataset(params, mids, history_len=cfg.history_len, stride=stride)
+    params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
+
+    if cfg.standardize:
+        params, mu, sig = standardize_params(params_raw)
+    else:
+        params, mu, sig = params_raw, None, None
+
+    return WindowedLOBParamsDataset(params=params, mids=mids, history_len=cfg.history_len, stride=stride, params_mean=mu, params_std=sig)
 
 
-def build_dataset_from_abides(
-    path_npz: str,
-    cfg: LOBConfig,
-    stride: int = 1,
-) -> WindowedLOBParamsDataset:
+def build_dataset_from_abides(path_npz: str, cfg: LOBConfig, stride: int = 1) -> WindowedLOBParamsDataset:
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     _, bids, asks = load_abides_l2_npz(path_npz)
     if bids.shape[1] != cfg.levels:
@@ -377,45 +391,34 @@ def build_dataset_from_abides(
     ask_p = asks[:, :, 0]
     ask_v = asks[:, :, 1]
 
-    params, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
-    return WindowedLOBParamsDataset(params, mids, history_len=cfg.history_len, stride=stride)
+    params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
+
+    if cfg.standardize:
+        params, mu, sig = standardize_params(params_raw)
+    else:
+        params, mu, sig = params_raw, None, None
+
+    return WindowedLOBParamsDataset(params=params, mids=mids, history_len=cfg.history_len, stride=stride, params_mean=mu, params_std=sig)
 
 
-def build_dataset_synthetic(
-    cfg: LOBConfig,
-    length: int = 200_000,
-    seed: int = 0,
-    tick: float = 0.01,
-    stride: int = 1,
-) -> WindowedLOBParamsDataset:
-    """Generate a quick synthetic L2 dataset (valid by construction).
-
-    This is *not* meant to be a perfect market simulator — it's for:
-      - sanity-checking training
-      - debugging feature maps
-      - ablations (levels, history_len, sampling speed)
-    """
+def build_dataset_synthetic(cfg: LOBConfig, length: int = 200_000, seed: int = 0, tick: float = 0.01, stride: int = 1) -> WindowedLOBParamsDataset:
     rng = np.random.default_rng(seed)
     L = cfg.levels
     T = int(length)
     fm = L2FeatureMap(L, cfg.eps)
 
-    # Mid random walk
     mid = np.zeros(T, dtype=np.float32)
     mid[0] = 100.0
     vol = 0.02
     shocks = rng.normal(0.0, vol, size=T).astype(np.float32)
     mid[1:] = mid[0] + np.cumsum(shocks[1:]).astype(np.float32)
 
-    # Spread (lognormal-ish) in price units; ensure >= 2*tick
     spread = (2.0 * tick) * np.exp(rng.normal(0.0, 0.25, size=T).astype(np.float32))
     spread = np.clip(spread, 2.0 * tick, None)
 
-    # Level gaps: positive, around 1-3 ticks
     ask_gaps = (tick) * np.exp(rng.normal(math.log(2.0), 0.35, size=(T, L - 1)).astype(np.float32))
     bid_gaps = (tick) * np.exp(rng.normal(math.log(2.0), 0.35, size=(T, L - 1)).astype(np.float32))
 
-    # Sizes: positive, decay with level
     base_size = np.exp(rng.normal(math.log(50.0), 0.5, size=(T, 1)).astype(np.float32))
     decay = np.exp(-0.15 * np.arange(L, dtype=np.float32))[None, :]
     ask_v = base_size * decay * np.exp(rng.normal(0.0, 0.2, size=(T, L)).astype(np.float32))
@@ -431,16 +434,18 @@ def build_dataset_synthetic(
         ask_p[:, i] = ask_p[:, i - 1] + ask_gaps[:, i - 1]
         bid_p[:, i] = bid_p[:, i - 1] - bid_gaps[:, i - 1]
 
-    params, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
-    return WindowedLOBParamsDataset(params, mids, history_len=cfg.history_len, stride=stride)
+    params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
 
+    if cfg.standardize:
+        params, mu, sig = standardize_params(params_raw)
+    else:
+        params, mu, sig = params_raw, None, None
 
-# -----------------------------
-# Small network utilities
-# -----------------------------
+    return WindowedLOBParamsDataset(params=params, mids=mids, history_len=cfg.history_len, stride=stride, params_mean=mu, params_std=sig)
+
 
 class MLP(nn.Module):
-    def __init__(self, in_dim: int, hidden: int, out_dim: int, dropout: float = 0.0, layer_norm: bool = False):
+    def __init__(self, in_dim: int, hidden: int, out_dim: int, dropout: float = 0.0, output_layer_norm: bool = False):
         super().__init__()
         self.net = nn.Sequential(
             nn.Linear(in_dim, hidden),
@@ -451,20 +456,14 @@ class MLP(nn.Module):
             nn.Dropout(dropout),
             nn.Linear(hidden, out_dim),
         )
-        self.ln = nn.LayerNorm(out_dim) if layer_norm else None
+        self.out_ln = nn.LayerNorm(out_dim) if output_layer_norm else None
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         y = self.net(x)
-        return self.ln(y) if self.ln is not None else y
+        return self.out_ln(y) if self.out_ln is not None else y
 
-
-# -----------------------------
-# Baseline: rectified-flow / flow-matching
-# -----------------------------
 
 class BiFlowLOB(nn.Module):
-    """Conditional rectified-flow model for L2 params (baseline)."""
-
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
@@ -478,31 +477,21 @@ class BiFlowLOB(nn.Module):
             dropout=cfg.dropout if cfg.num_layers > 1 else 0.0,
         )
 
-        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, layer_norm=False)
+        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, output_layer_norm=False)
 
         if cfg.cond_dim > 0:
-            self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, layer_norm=False)
+            self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, output_layer_norm=False)
         else:
             self.cond_mlp = None
 
-        in_dim = D + cfg.hidden_dim + cfg.hidden_dim
-        if cfg.cond_dim > 0:
-            in_dim += cfg.hidden_dim
-
-        self.v_net = MLP(in_dim, cfg.hidden_dim, D, dropout=cfg.dropout, layer_norm=cfg.layer_norm)
+        in_dim = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
+        self.v_net = MLP(in_dim, cfg.hidden_dim, D, dropout=cfg.dropout, output_layer_norm=False)
 
     def encode_ctx(self, ctx: torch.Tensor) -> torch.Tensor:
         _, (h_n, _) = self.ctx_rnn(ctx)
         return h_n[-1]
 
-    def forward(
-        self,
-        x_t: torch.Tensor,
-        t: torch.Tensor,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        cfg_drop: bool = False,
-    ) -> torch.Tensor:
+    def forward(self, x_t: torch.Tensor, t: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None, cfg_drop: bool = False) -> torch.Tensor:
         B = x_t.shape[0]
         ctx_emb = self.encode_ctx(ctx)
         t_emb = self.t_mlp(t)
@@ -517,8 +506,7 @@ class BiFlowLOB(nn.Module):
                 cond_in = cond
             parts.append(self.cond_mlp(cond_in))
 
-        h = torch.cat(parts, dim=1)
-        return self.v_net(h)
+        return self.v_net(torch.cat(parts, dim=1))
 
     def fm_loss(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         B, _ = x.shape
@@ -530,13 +518,7 @@ class BiFlowLOB(nn.Module):
         return F.mse_loss(v_hat, v_target)
 
     @torch.no_grad()
-    def sample(
-        self,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        steps: int = 32,
-        guidance_scale: float = 1.0,
-    ) -> torch.Tensor:
+    def sample(self, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None, steps: int = 32, guidance_scale: float = 1.0) -> torch.Tensor:
         device = ctx.device
         B = ctx.shape[0]
         D = self.cfg.state_dim
@@ -552,27 +534,18 @@ class BiFlowLOB(nn.Module):
                 v_uncond = self.forward(x, t, ctx, cond=torch.zeros_like(cond), cfg_drop=False)
                 v = v_uncond + guidance_scale * (v_cond - v_uncond)
             x = x + dt * v
+
+        if self.cfg.sample_clip and self.cfg.sample_clip > 0:
+            x = x.clamp(-self.cfg.sample_clip, self.cfg.sample_clip)
         return x
 
 
-# -----------------------------
-# Hybrid: BiFlow + MeanFlow (paired x<->z + 1-step sampling)
-# -----------------------------
-
 class BiMeanFlowLOB(nn.Module):
-    """BiFlow + MeanFlow hybrid for L2 params.
-
-    - Forward net f_psi(x, ctx, cond) -> z_hat  (paired noise)
-    - Reverse net u_theta(x_t, t, ctx, cond) -> mean displacement
-    - One-step sampling: x ~= z + u_theta(z, t=0, ctx, cond)
-    """
-
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
         D = cfg.state_dim
 
-        # Shared history encoder
         self.ctx_rnn = nn.LSTM(
             input_size=D,
             hidden_size=cfg.hidden_dim,
@@ -581,30 +554,22 @@ class BiMeanFlowLOB(nn.Module):
             dropout=cfg.dropout if cfg.num_layers > 1 else 0.0,
         )
 
-        # Time embedding
-        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, layer_norm=False)
+        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, output_layer_norm=False)
 
-        # Optional conditioning
         if cfg.cond_dim > 0:
-            self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, layer_norm=False)
+            self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0, output_layer_norm=False)
         else:
             self.cond_mlp = None
 
-        # Forward net f_psi: x -> z
-        f_in = D + cfg.hidden_dim
-        if cfg.cond_dim > 0:
-            f_in += cfg.hidden_dim
-        self.f_net = MLP(f_in, cfg.hidden_dim, D, dropout=cfg.dropout, layer_norm=cfg.layer_norm)
+        f_in = D + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
+        u_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
 
-        # Reverse MeanFlow displacement net u_theta: (x_t, t) -> u
-        u_in = D + cfg.hidden_dim + cfg.hidden_dim
-        if cfg.cond_dim > 0:
-            u_in += cfg.hidden_dim
-        self.u_net = MLP(u_in, cfg.hidden_dim, D, dropout=cfg.dropout, layer_norm=cfg.layer_norm)
+        self.f_net = MLP(f_in, cfg.hidden_dim, D, dropout=cfg.dropout, output_layer_norm=False)
+        self.u_net = MLP(u_in, cfg.hidden_dim, D, dropout=cfg.dropout, output_layer_norm=False)
 
     def encode_ctx(self, ctx: torch.Tensor) -> torch.Tensor:
         _, (h_n, _) = self.ctx_rnn(ctx)
-        return h_n[-1]  # [B, hidden_dim]
+        return h_n[-1]
 
     def _cond_emb(self, cond: Optional[torch.Tensor], B: int, device: torch.device, cfg_drop: bool) -> Optional[torch.Tensor]:
         if self.cond_mlp is None:
@@ -622,8 +587,7 @@ class BiMeanFlowLOB(nn.Module):
         ce = self._cond_emb(cond, B, x.device, cfg_drop)
         if ce is not None:
             parts.append(ce)
-        h = torch.cat(parts, dim=1)
-        return self.f_net(h)
+        return self.f_net(torch.cat(parts, dim=1))
 
     def u_forward(self, x_t: torch.Tensor, t: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor], cfg_drop: bool = False) -> torch.Tensor:
         B = x_t.shape[0]
@@ -633,76 +597,42 @@ class BiMeanFlowLOB(nn.Module):
         ce = self._cond_emb(cond, B, x_t.device, cfg_drop)
         if ce is not None:
             parts.append(ce)
-        h = torch.cat(parts, dim=1)
-        return self.u_net(h)
+        return self.u_net(torch.cat(parts, dim=1))
 
-    # -------- MeanFlow path helpers --------
-
-    def _alpha_sigma(self, t: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Return (alpha(t), sigma(t)) in [0,1]."""
-        if self.cfg.path == "linear":
-            return t, (1.0 - t)
-        if self.cfg.path == "cosine":
-            # alpha(0)=0, sigma(0)=1; alpha(1)=1, sigma(1)=0
-            a = torch.sin(0.5 * math.pi * t)
-            s = torch.cos(0.5 * math.pi * t)
-            return a, s
-        raise ValueError(f"Unknown path: {self.cfg.path}")
-
-    def loss(
-        self,
-        x: torch.Tensor,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Compute total loss and logging dict."""
+    def loss(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
         cfg = self.cfg
+        if cfg.path != "linear":
+            raise NotImplementedError("MeanFlow loss in this file is implemented for path='linear' only.")
+
         B, D = x.shape
         device = x.device
 
-        # ----- Forward pairing -----
         z_hat = self.f_forward(x, ctx, cond=cond, cfg_drop=True)
 
-        # Prior matching (simple moment match; stable & cheap)
         z_mean = z_hat.mean(dim=0)
         z_var = z_hat.var(dim=0, unbiased=False)
         loss_prior = (z_mean.pow(2).mean() + (z_var - 1.0).pow(2).mean())
 
-        # ----- MeanFlow displacement loss -----
         t = torch.rand(B, 1, device=device)
-        alpha, sigma = self._alpha_sigma(t)
-
-        # IMPORTANT: detach z_hat here to avoid forward net collapsing the training signal.
-        # Forward net is trained mainly by x-reconstruction + z-cycle + prior.
         z_for_path = z_hat.detach()
+        x_t = (1.0 - t) * z_for_path + t * x
 
-        x_t = alpha * x + sigma * z_for_path
-
-        # mean displacement target: x ≈ x_t + (1-t) * u
-        u_target = (x - x_t) / (1.0 - t + cfg.eps)
-
+        u_target = x - z_for_path
         u_hat = self.u_forward(x_t, t, ctx, cond=cond, cfg_drop=True)
         loss_mean = F.mse_loss(u_hat, u_target)
 
-        # ----- One-step x reconstruction via paired z_hat -----
         t0 = torch.zeros(B, 1, device=device)
         u0_hat = self.u_forward(z_hat, t0, ctx, cond=cond, cfg_drop=False)
         x_rec = z_hat + u0_hat
         loss_xrec = F.mse_loss(x_rec, x)
 
-        # ----- z cycle: z0 -> x_fake -> z_rec -----
         z0 = torch.randn(B, D, device=device)
         u0 = self.u_forward(z0, t0, ctx, cond=cond, cfg_drop=False)
         x_fake = z0 + u0
         z_rec = self.f_forward(x_fake, ctx, cond=cond, cfg_drop=False)
         loss_zcycle = F.mse_loss(z_rec, z0)
 
-        total = (
-            cfg.lambda_mean * loss_mean
-            + cfg.lambda_xrec * loss_xrec
-            + cfg.lambda_zcycle * loss_zcycle
-            + cfg.lambda_prior * loss_prior
-        )
+        total = cfg.lambda_mean * loss_mean + cfg.lambda_xrec * loss_xrec + cfg.lambda_zcycle * loss_zcycle + cfg.lambda_prior * loss_prior
 
         logs = {
             "loss_total": float(total.detach().cpu()),
@@ -714,13 +644,7 @@ class BiMeanFlowLOB(nn.Module):
         return total, logs
 
     @torch.no_grad()
-    def sample(
-        self,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        guidance_scale: float = 1.0,
-    ) -> torch.Tensor:
-        """One-step sampling (1 NFE): x = z + u(z, t=0)."""
+    def sample(self, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None, guidance_scale: float = 1.0) -> torch.Tensor:
         B = ctx.shape[0]
         D = self.cfg.state_dim
         device = ctx.device
@@ -734,16 +658,13 @@ class BiMeanFlowLOB(nn.Module):
             u_uncond = self.u_forward(z, t0, ctx, cond=torch.zeros_like(cond), cfg_drop=False)
             u = u_uncond + guidance_scale * (u_cond - u_uncond)
 
-        return z + u
+        x = z + u
+        if self.cfg.sample_clip and self.cfg.sample_clip > 0:
+            x = x.clamp(-self.cfg.sample_clip, self.cfg.sample_clip)
+        return x
 
 
-# -----------------------------
-# Simple metrics (for quick sanity checks)
-# -----------------------------
-
-def compute_basic_l2_metrics(
-    ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray
-) -> Dict[str, float]:
+def compute_basic_l2_metrics(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray) -> Dict[str, float]:
     mid = 0.5 * (ask_p[:, 0] + bid_p[:, 0])
     ret = np.diff(mid)
     spread = ask_p[:, 0] - bid_p[:, 0]
