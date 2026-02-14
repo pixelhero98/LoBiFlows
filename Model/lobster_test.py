@@ -1,193 +1,193 @@
-import pandas as pd
+"""lobster_test.py
+
+This file used to assume LOBSTER. It now trains/tests on *free* alternatives:
+  1) FI-2010 (public benchmark; 10 levels, 40 raw features per snapshot)
+  2) ABIDES-Markets simulator output (exported to .npz with bids/asks arrays)
+
+Usage examples
+--------------
+# FI-2010 (array with at least 40 columns)
+python lobster_test.py --dataset fi2010 --path /path/to/fi2010.npy --layout auto
+
+# ABIDES (npz with keys bids, asks, optional times)
+python lobster_test.py --dataset abides --path /path/to/abides_L2.npz
+
+The script prints quick metrics comparing real vs generated sequences.
+"""
+
+from __future__ import annotations
+
+import argparse
+import math
+from typing import Optional
+
 import numpy as np
 import torch
-from torch.utils.data import Dataset, DataLoader
-from demo_model import BiFlowLOB
+from torch.utils.data import DataLoader
+
+from demo_model import (
+    L2FeatureMap,
+    LOBConfig,
+    BiFlowLOB,
+    build_dataset_from_abides,
+    build_dataset_from_fi2010,
+    compute_basic_l2_metrics,
+)
 
 
-class LobsterDataset(Dataset):
-    def __init__(self, orderbook_file, history_len=50, prediction_horizon=1):
-        
-        # --- 1. Robust Loading Logic ---
-        import os
-        if not os.path.exists(orderbook_file):
-            print(f"FILE NOT FOUND: {orderbook_file}")
-            print("Generating REALISTIC Dummy Data (Random Walk)...")
-            
-            # FIX: Use Random Walk (cumsum), not random noise
-            # Generate 10,000 steps of log-returns
-            dummy_returns = np.random.randn(10000) * 0.0001 # Realistic volatility
-            dummy_prices = 100.0 * np.exp(np.cumsum(dummy_returns))
-            
-            # Create DataFrame to mimic LOBSTER
-            self.df = pd.DataFrame(index=range(10000), columns=range(4))
-            self.df.iloc[:, 0] = dummy_prices + 0.01 # Ask
-            self.df.iloc[:, 2] = dummy_prices - 0.01 # Bid
-            self.df.iloc[:, 1] = 100 # Ask Vol
-            self.df.iloc[:, 3] = 100 # Bid Vol
-        else:
-            print(f"Loading LOBSTER file: {orderbook_file}...")
-            self.df = pd.read_csv(orderbook_file, header=None)
+def seed_all(seed: int = 0):
+    import random
 
-        # --- 2. Processing (Same as before) ---
-        best_ask = self.df.iloc[:, 0]
-        best_bid = self.df.iloc[:, 2]
-        mid_prices = (best_ask + best_bid) / 2.0
-        
-        log_prices = np.log(mid_prices + 1e-8)
-        returns = log_prices.diff().fillna(0.0).values
-        
-        # --- 3. DYNAMIC SCALING (The Fix) ---
-        # Instead of hardcoding 1000, we normalize based on the data
-        # We want the standard deviation to be ~1.0
-        std_dev = np.std(returns) + 1e-8
-        self.scale_factor = 1.0 / std_dev
-        
-        self.returns = returns * self.scale_factor
-        
-        print(f"   [Data Stats] Raw Std: {std_dev:.6f} | Applied Scale: {self.scale_factor:.2f}")
-        
-        # 3. Order Imbalance (Conditioning)
-        # rho = (BidVol - AskVol) / (BidVol + AskVol)
-        # Col 1 = Best Ask Vol, Col 3 = Best Bid Vol
-        ask_vol = self.df.iloc[:, 1]
-        bid_vol = self.df.iloc[:, 3]
-        imbalance = (bid_vol - ask_vol) / (bid_vol + ask_vol + 1e-8)
-        self.imbalance = imbalance.values
-        
-        self.data = torch.tensor(
-            np.stack([self.returns, self.imbalance], axis=1), 
-            dtype=torch.float32
-        )
-        self.history_len = history_len
-        self.horizon = prediction_horizon
-        
-        print(f"Loaded {len(self.data)} ticks. Returns Scaled by {self.scale_factor}x")
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
 
-    def __len__(self):
-        # We need enough data for history + target
-        return len(self.data) - self.history_len - self.horizon
 
-    def __getitem__(self, idx):
-        # Input: History [t : t+50]
-        history = self.data[idx : idx + self.history_len]
-        
-        # Target: Future [t+50+horizon]
-        # We predict the return 'horizon' steps ahead
-        target = self.data[idx + self.history_len + self.horizon - 1]
-        
-        return history, target
+def train(cfg: LOBConfig, loader: DataLoader, device: torch.device) -> BiFlowLOB:
+    model = BiFlowLOB(cfg).to(device)
+    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
-csv_path = "AAPL_2012-06-21_34200000_57600000_orderbook_10.csv" 
+    step = 0
+    model.train()
+    while step < cfg.steps:
+        for batch in loader:
+            if cfg.cond_dim == 0:
+                hist, tgt, _meta = batch
+                cond = None
+            else:
+                hist, tgt, cond, _meta = batch
+                cond = cond.to(device)
 
-# Check if file exists, else use dummy (for testing code without file)
-import os
-if os.path.exists(csv_path):
-    dataset = LobsterDataset(csv_path, history_len=LOBConfig.history_len)
-    dataloader = DataLoader(dataset, batch_size=LOBConfig.batch_size, shuffle=True, drop_last=True)
-    print("Real Data Loaded Successfully.")
-else:
-    print("WARNING: CSV not found. Generating Dummy LOBSTER data for demo.")
-    # Create a dummy CSV for testing logic
-    dummy_df = pd.DataFrame(np.random.rand(10000, 4) * 100 + 100) # Prices
-    dummy_df.iloc[:, 1] = np.random.randint(1, 100, 10000) # Vols
-    dummy_df.iloc[:, 3] = np.random.randint(1, 100, 10000) # Vols
-    dummy_df.to_csv("dummy_lobster.csv", header=False, index=False)
-    dataset = LobsterDataset("dummy_lobster.csv", history_len=LOBConfig.history_len)
-    dataloader = DataLoader(dataset, batch_size=LOBConfig.batch_size, shuffle=True)
+            hist = hist.to(device).float()
+            tgt = tgt.to(device).float()
 
-# 2. Train Loop (Updated)
-model = BiFlowLOB(LOBConfig).to(LOBConfig.device)
-optimizer = optim.Adam(model.parameters(), lr=0.0001) # Lower LR for real data!
+            loss = model.fm_loss(tgt, hist, cond=cond)
 
-print("Starting Training on LOBSTER...")
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
+            opt.step()
 
-# We iterate through epochs now, not just random steps
-num_epochs = 500
-global_step = 0
+            step += 1
+            if step % 200 == 0:
+                print(f"step {step:6d} | fm_loss {loss.item():.4f}")
 
-for epoch in range(num_epochs):
-    for batch_hist, batch_target in dataloader:
-        
-        # Move to GPU
-        batch_hist = batch_hist.to(LOBConfig.device)
-        batch_target = batch_target.to(LOBConfig.device)
-        
-        optimizer.zero_grad()
-        
-        # We only predict the Return (feature 0), not the Imbalance (feature 1)
-        # But the model outputs both dimensions.
-        loss = model.compute_loss(batch_target, batch_hist)
-        
-        loss.backward()
-        optimizer.step()
-        
-        global_step += 1
-        if global_step % 100 == 0:
-            print(f"Epoch {epoch} | Step {global_step} | Loss: {loss.item():.6f}")
+            if step >= cfg.steps:
+                break
 
-print("Training Complete.")
+    return model
 
-print("\n3. Visualizing Model Performance on Loader Data...")
 
-# 1. Get a sample batch from the loader (Real/Dummy Data)
-# We need an iterator to grab just one batch
-data_iter = iter(dataloader)
-real_hist, real_target = next(data_iter)
+@torch.no_grad()
+def generate_one_sequence(
+    model: BiFlowLOB,
+    fm: L2FeatureMap,
+    history: torch.Tensor,
+    mid_prev: float,
+    gen_len: int,
+    device: torch.device,
+    steps: int = 32,
+    guidance_scale: float = 1.0,
+) -> np.ndarray:
+    """Autoregressive generation in *parameter space*.
 
-# Move to GPU
-real_hist = real_hist.to(LOBConfig.device)
+    Returns params sequence [gen_len, D].
+    """
+    model.eval()
 
-# 2. Generate Autoregressive Sequence
-# We take the first sample in the batch [Index 0]
-initial_history = real_hist[0].unsqueeze(0) # Shape: [1, 50, 2]
+    hist = history.clone().to(device).float()  # [H, D]
+    D = hist.shape[-1]
+    out = []
 
-# Generate 100 future steps
-model.eval()
-gen_path = []
-curr_hist = initial_history.clone()
+    # We generate params one step at a time, rolling the history window.
+    for _ in range(gen_len):
+        ctx = hist.unsqueeze(0)  # [1, H, D]
+        x_next = model.sample(ctx, cond=None, steps=steps, guidance_scale=guidance_scale).squeeze(0)
+        out.append(x_next.detach().cpu().numpy())
 
-for _ in range(100):
-    with torch.no_grad():
-        # Predict next return
-        next_step = model.generate_step(curr_hist) # Output: [1, 2]
-        gen_path.append(next_step)
-        
-        # Update history (Slide window)
-        # Append new prediction to the end, drop the first history point
-        curr_hist = torch.cat([curr_hist[:, 1:, :], next_step.unsqueeze(1)], dim=1)
+        # roll
+        hist = torch.cat([hist[1:], x_next.unsqueeze(0)], dim=0)
 
-# 3. Process Data for Plotting
-# Stack the list into a tensor
-gen_tensor = torch.stack(gen_path).squeeze(1).cpu() # Shape: [100, 2]
-gen_returns = gen_tensor[:, 0].numpy()
+    return np.stack(out, axis=0).astype(np.float32)
 
-# Get Real Future (just use the target batch for distribution comparison)
-# Note: In a real loader, we can't easily get the "next 100 steps" for the same sample 
-# without iterating, so we compare distribution against the *batch* targets.
-real_batch_returns = real_target[:, 0].cpu().numpy()
 
-# 4. Plot
-import matplotlib.pyplot as plt
-import seaborn as sns
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--dataset", choices=["fi2010", "abides"], required=True)
+    p.add_argument("--path", type=str, required=True)
+    p.add_argument("--layout", type=str, default="auto", choices=["auto", "interleaved", "blocks"])
+    p.add_argument("--levels", type=int, default=10)
+    p.add_argument("--history_len", type=int, default=50)
+    p.add_argument("--steps", type=int, default=5000)
+    p.add_argument("--batch_size", type=int, default=64)
+    p.add_argument("--seed", type=int, default=0)
+    p.add_argument("--eval_gen_len", type=int, default=2000)
+    args = p.parse_args()
 
-fig, axes = plt.subplots(1, 2, figsize=(14, 5))
+    seed_all(args.seed)
 
-# Plot A: Autoregressive Path (Cumulative Sum -> Price Shape)
-ax = axes[0]
-# We reconstruct a "Price Index" from returns
-gen_price = np.cumsum(gen_returns)
-ax.plot(gen_price, label='Generated Price Path', color='dodgerblue')
-ax.set_title("Generated Scenario (100 Steps)")
-ax.grid(alpha=0.3)
-ax.legend()
+    cfg = LOBConfig(
+        levels=args.levels,
+        history_len=args.history_len,
+        steps=args.steps,
+        batch_size=args.batch_size,
+    )
 
-# Plot B: Distribution Matching
-ax = axes[1]
-sns.kdeplot(real_batch_returns, ax=ax, fill=True, label='Real Data (Batch)', color='gray')
-sns.kdeplot(gen_returns, ax=ax, fill=True, label='Generated Data', color='dodgerblue')
-ax.set_title("Volatility Check (Real vs Generated)")
-ax.legend()
-ax.grid(alpha=0.3)
+    device = cfg.device
 
-plt.show()
+    if args.dataset == "fi2010":
+        ds = build_dataset_from_fi2010(args.path, cfg, layout=args.layout)
+    else:
+        ds = build_dataset_from_abides(args.path, cfg)
+
+    loader = DataLoader(ds, batch_size=cfg.batch_size, shuffle=True, drop_last=True)
+
+    print(f"Dataset windows: {len(ds):,} | levels={cfg.levels} | state_dim={cfg.state_dim}")
+
+    model = train(cfg, loader, device)
+
+    # ---------- quick evaluation (single-sequence) ----------
+    fm = L2FeatureMap(cfg.levels, cfg.eps)
+
+    # take one random window
+    idx = np.random.randint(0, len(ds))
+    if cfg.cond_dim == 0:
+        hist, _tgt, meta = ds[idx]
+    else:
+        hist, _tgt, _cond, meta = ds[idx]
+
+    hist_np = hist.numpy()
+
+    # Decode *real* history to L2 to compute metrics baseline.
+    # For decoding we need the mid at the start of the window.
+    init_mid = meta["init_mid_for_window"]
+    ask_p_r, ask_v_r, bid_p_r, bid_v_r, _mids_r = fm.decode_sequence(hist_np, init_mid=init_mid)
+    real_metrics = compute_basic_l2_metrics(ask_p_r, ask_v_r, bid_p_r, bid_v_r)
+
+    # Generate continuation and decode.
+    gen_params = generate_one_sequence(
+        model,
+        fm,
+        history=hist,
+        mid_prev=meta["mid_prev"],
+        gen_len=args.eval_gen_len,
+        device=device,
+    )
+
+    # For the generated sequence, we integrate mid starting from the *last* mid of the history.
+    init_mid_gen = meta["mid_prev"]
+    ask_p_g, ask_v_g, bid_p_g, bid_v_g, _mids_g = fm.decode_sequence(gen_params, init_mid=init_mid_gen)
+    gen_metrics = compute_basic_l2_metrics(ask_p_g, ask_v_g, bid_p_g, bid_v_g)
+
+    print("\n--- Real (history window) metrics ---")
+    for k, v in real_metrics.items():
+        print(f"{k:>14s}: {v:.6g}")
+
+    print("\n--- Generated (continuation) metrics ---")
+    for k, v in gen_metrics.items():
+        print(f"{k:>14s}: {v:.6g}")
+
+
+if __name__ == "__main__":
+    main()
