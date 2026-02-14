@@ -1,5 +1,4 @@
-"""lobster_test_bimean.py
-
+"""
 Train & evaluate L2 LOB generators on free datasets:
   1) FI-2010-like arrays (public benchmark; 10 levels, 40 raw features)
   2) ABIDES L2 snapshots (npz with bids/asks arrays)
