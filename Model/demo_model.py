@@ -19,12 +19,6 @@ What's in here
    - FI-2010-like array loader (public benchmark; 10 levels -> 40 raw features)
    - ABIDES L2 snapshot loader (npz with bids/asks arrays)
    - A built-in synthetic L2 generator for quick sanity checks / ablations
-
-Notes
------
-- FI-2010 is sometimes mistakenly referred to as "FI2020" informally. The common public benchmark is FI-2010.
-- This code is designed to be *paper-hackable*: small, readable, and easy to ablate.
-
 """
 
 from __future__ import annotations
