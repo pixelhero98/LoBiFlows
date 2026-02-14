@@ -20,7 +20,6 @@ python lobster_test_bimean.py --dataset synthetic --model bimean --synthetic_len
 python lobster_test_bimean.py --dataset fi2010 --path /path/to/fi2010.npy --model rectified --ode_steps 32
 
 This script prints quick real-vs-generated metrics for one random window.
-For a paper, you'd average metrics over many windows / multiple seeds.
 """
 
 from __future__ import annotations
