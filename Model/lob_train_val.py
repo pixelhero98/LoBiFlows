@@ -146,8 +146,6 @@ def generate_continuation(
       meta: dict (contains init_mid_for_window)
     """
     device = next(model.parameters()).device
-    D = ds.params.shape[1]
-
     item = ds[idx]
     # Unpack (history, target, [future], [cond], meta)
     if ds.future_horizon > 0:
@@ -197,6 +195,8 @@ def eval_one_window(
     # choose an idx that has enough room for horizon in the raw sequence
     if idx is None:
         valid = np.where(ds.start_indices + horizon < len(ds.params))[0]
+        if len(valid) == 0:
+            raise ValueError("No valid windows for the requested horizon.")
         idx = int(np.random.choice(valid))
 
     t = int(ds.start_indices[idx])
