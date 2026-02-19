@@ -368,10 +368,22 @@ def load_abides_l2_npz(path: str) -> Tuple[np.ndarray, np.ndarray, np.ndarray]:
 
 
 def build_dataset_from_fi2010(path: str, cfg: LOBConfig, layout: str = "auto", stride: int = 1) -> WindowedLOBParamsDataset:
+    """Build a training dataset from FI-2010/FI-2020 style arrays."""
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     x = load_fi2010_like_array(path)
     ask_p, ask_v, bid_p, bid_v = fm.split_l2_from_array(x, layout=layout)
     params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
+
+    return _build_windowed_dataset(params_raw, mids, cfg, stride)
+
+
+def _build_windowed_dataset(
+    params_raw: np.ndarray,
+    mids: np.ndarray,
+    cfg: LOBConfig,
+    stride: int,
+) -> WindowedLOBParamsDataset:
+    """Standardize (optional) and wrap in WindowedLOBParamsDataset."""
 
     if cfg.standardize:
         params, mu, sig = standardize_params(params_raw)
@@ -402,21 +414,7 @@ def build_dataset_from_abides(path_npz: str, cfg: LOBConfig, stride: int = 1) ->
     ask_v = asks[:, :, 1]
 
     params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
-
-    if cfg.standardize:
-        params, mu, sig = standardize_params(params_raw)
-    else:
-        params, mu, sig = params_raw, None, None
-
-    return WindowedLOBParamsDataset(
-        params=params,
-        mids=mids,
-        history_len=cfg.history_len,
-        stride=stride,
-        params_mean=mu,
-        params_std=sig,
-        future_horizon=cfg.rollout_K,
-    )
+    return _build_windowed_dataset(params_raw, mids, cfg, stride)
 
 
 def build_dataset_synthetic(
@@ -464,21 +462,7 @@ def build_dataset_synthetic(
         bid_p[:, i] = bid_p[:, i - 1] - bid_gaps[:, i - 1]
 
     params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
-
-    if cfg.standardize:
-        params, mu, sig = standardize_params(params_raw)
-    else:
-        params, mu, sig = params_raw, None, None
-
-    return WindowedLOBParamsDataset(
-        params=params,
-        mids=mids,
-        history_len=cfg.history_len,
-        stride=stride,
-        params_mean=mu,
-        params_std=sig,
-        future_horizon=cfg.rollout_K,
-    )
+    return _build_windowed_dataset(params_raw, mids, cfg, stride)
 
 
 # -----------------------------
