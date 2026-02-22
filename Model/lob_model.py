@@ -2,8 +2,8 @@
 
 Our proposed model: conditional Normalizing Flow + BiFlow-style distillation.
 
-Reuses shared utilities from `lob_models_baselines`:
-    from lob_models_baselines import LOBConfig, MLP
+Reuses shared utilities from `lob_baselines`:
+    from lob_baselines import LOBConfig, MLP
 
 Contains:
 - BiFlowNFLOB: forward conditional NF (NLL), plus reverse conditional NF trained with BiFlow hidden alignment.
@@ -23,7 +23,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lob_models_baselines import LOBConfig, MLP
+from lob_baselines import LOBConfig, MLP
 
 
 # -----------------------------
