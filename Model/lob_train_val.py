@@ -3,12 +3,15 @@
 Training + evaluation utilities for L2 LOB generators.
 
 This file contains:
-- train_loop(): trains BiMeanFlowLOB or BiFlowLOB on a WindowedLOBParamsDataset
+- train_loop(): trains baseline models (BiMeanFlowLOB, BiFlowLOB) or our NF model (BiFlowNFLOB)
 - generate_continuation(): autoregressive continuation in normalized space
 - eval_one_window(): decodes raw L2 and prints metrics real vs generated
 - eval_many_windows(): evaluates metrics over many random windows (recommended for paper figs)
 
-Models: `lob_model.py`
+Models:
+  - Baselines: `lob_models_baselines.py`
+  - Ours:      `lob_models_ours.py`
+
 Datasets/feature map/metrics: `lob_datasets.py`
 """
 
@@ -20,8 +23,27 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-from lob_model import LOBConfig, BiMeanFlowLOB, BiFlowLOB
-from lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics
+# Models (baselines + ours)
+try:
+    from Model.lob_models_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB  # type: ignore
+except ImportError:
+    try:
+        from lob_models_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB
+    except ImportError:  # backward compat
+        from lob_model import LOBConfig, BiMeanFlowLOB, BiFlowLOB
+
+try:
+    from Model.lob_models_ours import BiFlowNFLOB  # type: ignore
+except ImportError:
+    try:
+        from lob_models_ours import BiFlowNFLOB
+    except ImportError:
+        BiFlowNFLOB = None  # type: ignore
+
+try:
+    from Model.lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics  # type: ignore
+except ImportError:
+    from lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics
 
 
 def seed_all(seed: int = 0):
@@ -64,27 +86,61 @@ def train_loop(
     model_name: str = "bimean",
     steps: int = 3000,
     log_every: int = 200,
+    nf_stage: str = "forward",
+    steps_reverse: Optional[int] = None,
 ) -> torch.nn.Module:
     """
     model_name:
-      - "bimean"  -> BiMeanFlowLOB (1-step sampling)
-      - "biflow"  -> BiFlowLOB (multi-step sampling baseline)
+      - "bimean"     -> BiMeanFlowLOB (1-step sampling baseline)
+      - "biflow"     -> BiFlowLOB (multi-step sampling baseline)
+      - "biflow_nf"  -> BiFlowNFLOB (ours; conditional Normalizing Flow + BiFlow distillation)
+
+    For model_name=="biflow_nf", use nf_stage:
+      - "forward":   train forward NF with NLL (x->z)
+      - "reverse":   train reverse NF with BiFlow loss (z->x); forward should be pretrained
+      - "two_stage": run forward then reverse (steps for forward, steps_reverse for reverse)
     """
     device = cfg.device
     loader = make_loader(ds, batch_size=cfg.batch_size, shuffle=True, num_workers=0)
     it = iter(loader)
 
+    model_name = model_name.lower()
+    nf_stage = nf_stage.lower()
+
+    # -------------------------
+    # Model + optimizer
+    # -------------------------
     if model_name == "bimean":
         model = BiMeanFlowLOB(cfg).to(device)
         if ds.is_standardized:
             model.set_scaler(ds.params_mean, ds.params_std)
+        opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+
     elif model_name == "biflow":
         model = BiFlowLOB(cfg).to(device)
+        opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+    elif model_name == "biflow_nf":
+        if BiFlowNFLOB is None:
+            raise ImportError("BiFlowNFLOB not found. Ensure lob_models_ours.py is available on PYTHONPATH.")
+        model = BiFlowNFLOB(cfg).to(device)
+
+        if steps_reverse is None:
+            steps_reverse = steps
+
+        if nf_stage in {"reverse", "rev"}:
+            model.freeze_forward()
+            opt = torch.optim.AdamW(model.reverse_flow.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+        else:
+            # forward or two_stage: start with forward
+            opt = torch.optim.AdamW(model.forward_flow.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+
     else:
-        raise ValueError("model_name must be 'bimean' or 'biflow'")
+        raise ValueError("model_name must be 'bimean', 'biflow', or 'biflow_nf'")
 
-    opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
-
+    # -------------------------
+    # Training stage 1
+    # -------------------------
     model.train()
     for step in range(1, steps + 1):
         try:
@@ -106,9 +162,17 @@ def train_loop(
 
         if model_name == "bimean":
             loss, logs = model.loss(tgt, hist, cond=cond, x_future=fut)
-        else:
+
+        elif model_name == "biflow":
             loss = model.fm_loss(tgt, hist, cond=cond)
             logs = {"loss_total": float(loss.detach().cpu())}
+
+        else:  # biflow_nf
+            if nf_stage in {"reverse", "rev"}:
+                loss, logs = model.biflow_loss(tgt, hist, cond=cond)
+            else:
+                loss = model.nll_loss(tgt, hist, cond=cond)
+                logs = {"loss_total": float(loss.detach().cpu())}
 
         loss.backward()
         if cfg.grad_clip and cfg.grad_clip > 0:
@@ -122,8 +186,51 @@ def train_loop(
                     f"xrec {logs['loss_xrec']:.4f} | zcyc {logs['loss_zcycle']:.4f} | prior {logs['loss_prior']:.4f} | "
                     f"imb {logs['loss_imb']:.4f} | roll {logs['loss_roll']:.4f}"
                 )
-            else:
+            elif model_name == "biflow":
                 print(f"step {step:5d} | fm_loss {logs['loss_total']:.4f}")
+            else:
+                if nf_stage in {"reverse", "rev"}:
+                    print(
+                        f"step {step:5d} | rev_total {logs['loss_total']:.4f} | recon {logs['loss_recon']:.4f} | "
+                        f"align {logs['loss_hidden_align']:.4f} | zcyc {logs['loss_cycle_z']:.4f}"
+                    )
+                else:
+                    print(f"step {step:5d} | fwd_nll {logs['loss_total']:.4f}")
+
+    # -------------------------
+    # Training stage 2 (optional)
+    # -------------------------
+    if model_name == "biflow_nf" and nf_stage in {"two_stage", "both"}:
+        assert steps_reverse is not None
+        model.freeze_forward()
+        opt = torch.optim.AdamW(model.reverse_flow.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+        model.train()
+        for step2 in range(1, steps_reverse + 1):
+            try:
+                batch = next(it)
+            except StopIteration:
+                it = iter(loader)
+                batch = next(it)
+
+            hist, tgt, _fut, cond = _parse_batch(batch, cfg)
+            hist = hist.to(device).float()
+            tgt = tgt.to(device).float()
+            if cond is not None:
+                cond = cond.to(device).float()
+
+            opt.zero_grad(set_to_none=True)
+            loss, logs = model.biflow_loss(tgt, hist, cond=cond)
+            loss.backward()
+            if cfg.grad_clip and cfg.grad_clip > 0:
+                torch.nn.utils.clip_grad_norm_(model.reverse_flow.parameters(), cfg.grad_clip)
+            opt.step()
+
+            if (step2 % log_every) == 0 or step2 == 1:
+                print(
+                    f"[rev] step {step2:5d} | total {logs['loss_total']:.4f} | recon {logs['loss_recon']:.4f} | "
+                    f"align {logs['loss_hidden_align']:.4f} | zcyc {logs['loss_cycle_z']:.4f}"
+                )
 
     return model
 
@@ -147,6 +254,7 @@ def generate_continuation(
     """
     device = next(model.parameters()).device
     item = ds[idx]
+
     # Unpack (history, target, [future], [cond], meta)
     if ds.future_horizon > 0:
         if len(item) == 4:
@@ -162,16 +270,19 @@ def generate_continuation(
             hist, _tgt, cond, meta = item
 
     ctx = hist.unsqueeze(0).to(device).float()
-
-    # cond is per-step; expand to batch if provided
     cond_b = cond.unsqueeze(0).to(device).float() if cond is not None else None
+
+    model_name = model_name.lower()
 
     gen = []
     for _ in range(horizon):
         if model_name == "bimean":
             x_next = model.sample(ctx, cond=cond_b)  # [1,D]
-        else:
+        elif model_name == "biflow":
             x_next = model.sample(ctx, cond=cond_b, steps=ode_steps)  # [1,D]
+        else:  # biflow_nf
+            x_next = model.sample(ctx, cond=cond_b)  # [1,D]
+
         gen.append(x_next.squeeze(0).detach().cpu())
         ctx = torch.cat([ctx[:, 1:, :], x_next.unsqueeze(1)], dim=1)
 
@@ -216,7 +327,9 @@ def eval_one_window(
     init_mid = float(meta["init_mid_for_window"])
 
     ask_p_r, ask_v_r, bid_p_r, bid_v_r, _ = fm.decode_sequence(real_raw, init_mid=init_mid)
-    ask_p_g, ask_v_g, bid_p_g, bid_v_g, _ = fm.decode_sequence(np.concatenate([hist_raw, gen_raw], axis=0), init_mid=init_mid)
+    ask_p_g, ask_v_g, bid_p_g, bid_v_g, _ = fm.decode_sequence(
+        np.concatenate([hist_raw, gen_raw], axis=0), init_mid=init_mid
+    )
 
     mr = compute_basic_l2_metrics(ask_p_r, ask_v_r, bid_p_r, bid_v_r)
     mg = compute_basic_l2_metrics(ask_p_g, ask_v_g, bid_p_g, bid_v_g)
@@ -270,14 +383,16 @@ def eval_many_windows(
 
         init_mid = float(meta["init_mid_for_window"])
         ask_p_r, ask_v_r, bid_p_r, bid_v_r, _ = fm.decode_sequence(real_raw, init_mid=init_mid)
-        ask_p_g, ask_v_g, bid_p_g, bid_v_g, _ = fm.decode_sequence(np.concatenate([hist_raw, gen_raw], axis=0), init_mid=init_mid)
+        ask_p_g, ask_v_g, bid_p_g, bid_v_g, _ = fm.decode_sequence(
+            np.concatenate([hist_raw, gen_raw], axis=0), init_mid=init_mid
+        )
 
         real_rows.append(compute_basic_l2_metrics(ask_p_r, ask_v_r, bid_p_r, bid_v_r))
         gen_rows.append(compute_basic_l2_metrics(ask_p_g, ask_v_g, bid_p_g, bid_v_g))
 
     def summarize(rows):
         keys = rows[0].keys()
-        out = {}
+        out: Dict[str, Dict[str, float]] = {}
         for k in keys:
             vals = np.array([r[k] for r in rows], dtype=np.float64)
             out[k] = {"mean": float(np.nanmean(vals)), "std": float(np.nanstd(vals))}

@@ -12,7 +12,7 @@ This file contains:
     * Synthetic generator (sanity + ablations)
 - Basic metrics for quick checks (computed in raw L2 space)
 
-Models live in `lob_model.py`.
+Models live in `lob_models_baselines.py` (baselines) and `lob_models_ours.py` (ours).
 Training/evaluation loops live in `lob_train_val.py`.
 """
 
@@ -25,7 +25,13 @@ from typing import Dict, Optional, Tuple, Union
 import numpy as np
 import torch
 
-from lob_model import LOBConfig
+try:
+    from Model.lob_models_baselines import LOBConfig  # type: ignore
+except ImportError:
+    try:
+        from lob_models_baselines import LOBConfig
+    except ImportError:  # backward compat
+        from lob_model import LOBConfig
 
 
 ArrayLike = Union[np.ndarray, torch.Tensor]
