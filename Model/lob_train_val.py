@@ -12,7 +12,7 @@ Key feature for ICASSP plots:
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 
 import numpy as np
 import torch
@@ -162,15 +162,16 @@ def eval_one_window(
     model_name: str = "lobiflow",
     seed: int = 0,
 ) -> Dict[str, Dict[str, float]]:
+    _ = model_name
     rng = np.random.default_rng(seed)
     idx = int(rng.integers(0, len(ds)))
     batch = ds[idx]
     # normalize output format
     if len(batch) == 3:
-        hist, tgt, meta = batch
+        hist, _, meta = batch
         cond = None
     else:
-        hist, tgt, cond, meta = batch
+        hist, _, cond, meta = batch
     t0 = int(meta["t"])
     init_mid = float(meta["init_mid_for_window"])
 
@@ -185,10 +186,8 @@ def eval_one_window(
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     # denorm if available
     if ds.params_mean is not None and ds.params_std is not None:
-        hist_np = (hist[0].cpu().numpy() * ds.params_std[None, :] + ds.params_mean[None, :]).astype(np.float32)
         gen_np = (gen * ds.params_std[None, :] + ds.params_mean[None, :]).astype(np.float32)
     else:
-        hist_np = hist[0].cpu().numpy().astype(np.float32)
         gen_np = gen.astype(np.float32)
 
     # Real window from dataset raw params (for comparison)

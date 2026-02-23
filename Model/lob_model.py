@@ -108,7 +108,7 @@ class LoBiFlow(nn.Module):
         - one-step reconstruction at t=0
         - z-cycle consistency
         """
-        B, D = x.shape
+        B = x.shape[0]
         z_hat = self.f_forward(x, hist, cond=cond)
 
         # Prior match (moment matching) on z_hat
