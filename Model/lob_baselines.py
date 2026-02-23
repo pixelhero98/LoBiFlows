@@ -250,16 +250,16 @@ class BiFlowLOB(nn.Module):
         v_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
         self.v_net = MLP(v_in, cfg.hidden_dim, D, dropout=cfg.dropout)
 
-    def _ctx(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        ctx_tokens, ctx_pool = self.ctx_enc(hist)
+    def _ctx(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+        ctx_tokens, _ = self.ctx_enc(hist)
         t_e = self.cond_emb.embed_t(t)
         c_e = self.cond_emb.embed_cond(cond)
         q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
         ctx = self.cross(q, ctx_tokens)
-        return ctx_tokens, ctx, c_e
+        return ctx, c_e
 
     def v_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        _, ctx, c_e = self._ctx(hist, x_t, t, cond)
+        ctx, c_e = self._ctx(hist, x_t, t, cond)
         t_e = self.cond_emb.embed_t(t)
         pieces = [x_t, ctx, t_e]
         if c_e is not None:
@@ -267,7 +267,7 @@ class BiFlowLOB(nn.Module):
         return self.v_net(torch.cat(pieces, dim=-1))
 
     def fm_loss(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        B, D = x.shape
+        B = x.shape[0]
         z = torch.randn_like(x)
         t = torch.rand(B, 1, device=x.device)
         x_t = (1 - t) * z + t * x
