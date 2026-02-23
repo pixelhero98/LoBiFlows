@@ -1,4 +1,4 @@
-"""lob_models_ours.py
+"""lob_model.py
 
 Our proposed model: conditional Normalizing Flow + BiFlow-style distillation.
 

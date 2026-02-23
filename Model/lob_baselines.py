@@ -1,4 +1,4 @@
-"""lob_models_baselines.py
+"""lob_baselines.py
 
 Baselines for LoBiFlows (for comparison in experiments).
 
@@ -9,7 +9,7 @@ Contains:
 - BiMeanFlowLOB: BiFlow + MeanFlow hybrid (1-step), with optional imbalance + rollout regularizers
 
 Use:
-    from lob_models_baselines import LOBConfig, BiFlowLOB, BiMeanFlowLOB
+    from lob_baselines import LOBConfig, BiFlowLOB, BiMeanFlowLOB
 """
 
 from __future__ import annotations

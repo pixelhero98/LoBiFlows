@@ -9,8 +9,8 @@ This file contains:
 - eval_many_windows(): evaluates metrics over many random windows (recommended for paper figs)
 
 Models:
-  - Baselines: `lob_models_baselines.py`
-  - Ours:      `lob_models_ours.py`
+  - Baselines: `lob_baselines.py`
+  - Ours:      `lob_model.py`
 
 Datasets/feature map/metrics: `lob_datasets.py`
 """
@@ -25,18 +25,18 @@ from torch.utils.data import DataLoader
 
 # Models (baselines + ours)
 try:
-    from Model.lob_models_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB  # type: ignore
+    from Model.lob_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB  # type: ignore
 except ImportError:
     try:
-        from lob_models_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB
+        from lob_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB
     except ImportError:  # backward compat
         from lob_model import LOBConfig, BiMeanFlowLOB, BiFlowLOB
 
 try:
-    from Model.lob_models_ours import BiFlowNFLOB  # type: ignore
+    from Model.lob_model import BiFlowNFLOB  # type: ignore
 except ImportError:
     try:
-        from lob_models_ours import BiFlowNFLOB
+        from lob_model import BiFlowNFLOB
     except ImportError:
         BiFlowNFLOB = None  # type: ignore
 
@@ -122,7 +122,7 @@ def train_loop(
 
     elif model_name == "biflow_nf":
         if BiFlowNFLOB is None:
-            raise ImportError("BiFlowNFLOB not found. Ensure lob_models_ours.py is available on PYTHONPATH.")
+            raise ImportError("BiFlowNFLOB not found. Ensure lob_model.py is available on PYTHONPATH.")
         model = BiFlowNFLOB(cfg).to(device)
 
         if steps_reverse is None:
