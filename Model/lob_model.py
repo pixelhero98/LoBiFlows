@@ -1,17 +1,15 @@
 """lob_model.py
 
-LoBiFlow (ours): fast Level-2 (L2) limit order book generator.
+LoBiFlow (OUR main method) for Level-2 LOB parameter generation.
 
-This module intentionally contains ONLY the main method used in the paper:
-- LoBiFlow: paired latent + mean/rectified-flow hybrid with optional regularizers.
-  Sampling supports variable NFE via Euler integration (steps=1,2,4,...).
+LoBiFlow is a 1-NFE (and few-NFE) generator built on:
+- Paired latent encoder f_psi(x, hist, cond) -> z_hat
+- Displacement/velocity field u_theta(x_t, t, hist, cond) -> u
+- One-step sampling: x = z + u(z, t=0, ...)
+- Few-step sampling: Euler integrate dx/dt = u(x,t,...) for NFE steps
 
-Baselines live in `lob_baselines.py`:
-- BiFlowLOB: rectified-flow / flow-matching (multi-step)
-- BiFlowNFLOB: BiFlow-style normalizing flow (NLL + distillation)
-
-Reuses shared config/utilities from `lob_baselines`:
-    from lob_baselines import LOBConfig, MLP
+This file intentionally contains ONLY our method.
+Baselines are in `lob_baselines.py`.
 """
 
 from __future__ import annotations
@@ -23,20 +21,25 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-from lob_baselines import LOBConfig, MLP
+from lob_baselines import (
+    LOBConfig,
+    MLP,
+    CondEmbedder,
+    build_context_encoder,
+    CrossAttentionConditioner,
+)
 
+# NOTE: We re-export LoBiFlow as the main class name, but keep BiMeanFlowLOB alias
+# to preserve compatibility with older scripts.
 
 
 class LoBiFlow(nn.Module):
-    """LoBiFlow (ours): paired-latent + mean/rectified-flow hybrid for L2 params.
+    """LoBiFlow: paired latent + mean/rectified-flow hybrid with LOB-aware conditioning.
 
-    - Forward net f_psi(x, ctx, cond) -> z_hat  (paired)
-    - Reverse net u_theta(x_t, t, ctx, cond) -> mean displacement
-    - One-step sampling: x = z + u(z, t=0, ctx, cond)
-
-    Extras:
-    - imbalance moment matching loss (raw space)
-    - short rollout consistency loss (normalized space)
+    Compared to the original BiMeanFlow baseline, this version adds:
+    - Transformer/LSTM context encoder selectable by cfg.ctx_encoder
+    - Cross-attention conditioning over full history tokens (improves realism)
+    - Supports variable NFE at sampling time (steps parameter)
     """
 
     def __init__(self, cfg: LOBConfig):
@@ -44,34 +47,26 @@ class LoBiFlow(nn.Module):
         self.cfg = cfg
         D = cfg.state_dim
 
-        self.ctx_rnn = nn.LSTM(
-            input_size=D,
-            hidden_size=cfg.hidden_dim,
-            num_layers=cfg.num_layers,
-            batch_first=True,
-            dropout=cfg.dropout if cfg.num_layers > 1 else 0.0,
-        )
+        self.ctx_enc = build_context_encoder(cfg)
+        self.cond_emb = CondEmbedder(cfg)
+        self.cross = CrossAttentionConditioner(cfg)
 
-        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
+        self.x_proj = nn.Linear(D, cfg.hidden_dim)
 
-        if cfg.cond_dim > 0:
-            self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
-        else:
-            self.cond_mlp = None
-
+        # f_psi: (x, ctx_attn, cond_emb) -> z_hat
         f_in = D + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-        u_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-
         self.f_net = MLP(f_in, cfg.hidden_dim, D, dropout=cfg.dropout)
+
+        # u_theta: (x_t, ctx_attn, t_emb, cond_emb) -> u
+        u_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
         self.u_net = MLP(u_in, cfg.hidden_dim, D, dropout=cfg.dropout)
 
-        # Standardizer buffers (for imbalance loss in raw space)
+        # Standardizer buffers (for optional raw-space losses if you add them)
         self.register_buffer("scaler_mu", torch.zeros(D), persistent=False)
         self.register_buffer("scaler_sigma", torch.ones(D), persistent=False)
         self.has_scaler: bool = False
 
     def set_scaler(self, mu: np.ndarray, sigma: np.ndarray):
-        """Set (mu, sigma) used for denormalization inside the model (imbalance loss)."""
         mu_t = torch.from_numpy(mu.astype(np.float32))
         sig_t = torch.from_numpy(sigma.astype(np.float32))
         if mu_t.numel() != self.scaler_mu.numel():
@@ -80,187 +75,100 @@ class LoBiFlow(nn.Module):
         self.scaler_sigma.copy_(sig_t)
         self.has_scaler = True
 
-    def encode_ctx(self, ctx: torch.Tensor) -> torch.Tensor:
-        _, (h_n, _) = self.ctx_rnn(ctx)
-        return h_n[-1]
+    def _prep(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]):
+        # history tokens + cross-attn summary conditioned on x_ref/t/cond
+        ctx_tokens, _ = self.ctx_enc(hist)  # tokens: [B,T,H]
+        t_e = self.cond_emb.embed_t(t)
+        c_e = self.cond_emb.embed_cond(cond)
+        q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
+        ctx = self.cross(q, ctx_tokens)
+        return ctx, t_e, c_e
 
-    def _cond_emb(self, cond: Optional[torch.Tensor], B: int, device: torch.device, cfg_drop: bool) -> Optional[torch.Tensor]:
-        if self.cond_mlp is None:
-            return None
-        assert cond is not None
-        if cfg_drop:
-            drop_mask = (torch.rand(B, device=device) < self.cfg.cfg_dropout).float().unsqueeze(1)
-            cond = cond * (1.0 - drop_mask)
-        return self.cond_mlp(cond)
+    def f_forward(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        t0 = torch.zeros(x.shape[0], 1, device=x.device)
+        ctx, _, c_e = self._prep(hist, x, t0, cond)
+        parts = [x, ctx]
+        if c_e is not None:
+            parts.append(c_e)
+        return self.f_net(torch.cat(parts, dim=-1))
 
-    def f_forward(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor], cfg_drop: bool = False) -> torch.Tensor:
-        B = x.shape[0]
-        ctx_emb = self.encode_ctx(ctx)
-        parts = [x, ctx_emb]
-        ce = self._cond_emb(cond, B, x.device, cfg_drop)
-        if ce is not None:
-            parts.append(ce)
-        return self.f_net(torch.cat(parts, dim=1))
+    def u_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        ctx, t_e, c_e = self._prep(hist, x_t, t, cond)
+        parts = [x_t, ctx, t_e]
+        if c_e is not None:
+            parts.append(c_e)
+        return self.u_net(torch.cat(parts, dim=-1))
 
-    def u_forward(self, x_t: torch.Tensor, t: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor], cfg_drop: bool = False) -> torch.Tensor:
-        B = x_t.shape[0]
-        ctx_emb = self.encode_ctx(ctx)
-        t_emb = self.t_mlp(t)
-        parts = [x_t, ctx_emb, t_emb]
-        ce = self._cond_emb(cond, B, x_t.device, cfg_drop)
-        if ce is not None:
-            parts.append(ce)
-        return self.u_net(torch.cat(parts, dim=1))
+    def loss(self, x: torch.Tensor, hist: torch.Tensor, fut: Optional[torch.Tensor] = None, cond: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
+        """Core LoBiFlow objective (compact, ICASSP-friendly).
 
-    # ---- helpers for imbalance loss ----
-
-    def _denorm_torch(self, x_norm: torch.Tensor) -> torch.Tensor:
-        mu = self.scaler_mu.to(device=x_norm.device, dtype=x_norm.dtype)
-        sig = self.scaler_sigma.to(device=x_norm.device, dtype=x_norm.dtype)
-        return x_norm * sig + mu
-
-    def _abs_imb_from_raw(self, x_raw: torch.Tensor) -> torch.Tensor:
-        """Compute |imb| from RAW params using best-level sizes."""
-        L = self.cfg.levels
-        ask_logv0 = 2 * L        # start of log_ask_v
-        bid_logv0 = 3 * L        # start of log_bid_v
-
-        ask_logv1 = x_raw[:, ask_logv0].clamp(-10.0, 10.0)
-        bid_logv1 = x_raw[:, bid_logv0].clamp(-10.0, 10.0)
-        ask_v1 = torch.exp(ask_logv1)
-        bid_v1 = torch.exp(bid_logv1)
-        imb = (bid_v1 - ask_v1) / (bid_v1 + ask_v1 + 1e-8)
-        return imb.abs()
-
-    # ---- main loss ----
-
-    def loss(
-        self,
-        x: torch.Tensor,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        x_future: Optional[torch.Tensor] = None,  # [B,K,D] (normalized) optional
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        cfg = self.cfg
-        if cfg.path != "linear":
-            raise NotImplementedError("This implementation supports path='linear' only.")
-
+        Terms:
+        - prior match on z_hat mean/var
+        - mean/flow-matching on linear path between z_hat and x
+        - one-step reconstruction at t=0
+        - z-cycle consistency
+        """
         B, D = x.shape
-        device = x.device
+        z_hat = self.f_forward(x, hist, cond=cond)
 
-        # ----- Forward pairing -----
-        z_hat = self.f_forward(x, ctx, cond=cond, cfg_drop=True)
+        # Prior match (moment matching) on z_hat
+        mu = z_hat.mean(dim=0)
+        var = z_hat.var(dim=0, unbiased=False)
+        prior = (mu**2).mean() + (var - 1.0).abs().mean()
 
-        # Prior moment match for z_hat ~ N(0, I)
-        z_mean = z_hat.mean(dim=0)
-        z_var = z_hat.var(dim=0, unbiased=False)
-        loss_prior = (z_mean.pow(2).mean() + (z_var - 1.0).pow(2).mean())
+        # Mean / rectified flow loss
+        t = torch.rand(B, 1, device=x.device)
+        x_t = (1 - t) * z_hat + t * x
+        u_target = x - z_hat
+        u_hat = self.u_forward(x_t, t, hist, cond=cond)
+        mean = F.mse_loss(u_hat, u_target)
 
-        # ----- MeanFlow displacement loss (linear path) -----
-        t = torch.rand(B, 1, device=device)
-        z_for_path = z_hat.detach()
-        x_t = (1.0 - t) * z_for_path + t * x
+        # One-step reconstruction at t=0
+        t0 = torch.zeros(B, 1, device=x.device)
+        u0 = self.u_forward(z_hat, t0, hist, cond=cond)
+        x_rec = z_hat + u0
+        xrec = F.mse_loss(x_rec, x)
 
-        u_target = x - z_for_path
-        u_hat = self.u_forward(x_t, t, ctx, cond=cond, cfg_drop=True)
-        loss_mean = F.mse_loss(u_hat, u_target)
+        # z-cycle: z0 -> x_fake -> z_rec
+        z0 = torch.randn_like(x)
+        u_z0 = self.u_forward(z0, t0, hist, cond=cond)
+        x_fake = z0 + u_z0
+        z_rec = self.f_forward(x_fake, hist, cond=cond)
+        zcycle = F.mse_loss(z_rec, z0)
 
-        # ----- One-step x reconstruction via paired z_hat -----
-        t0 = torch.zeros(B, 1, device=device)
-        u0_hat = self.u_forward(z_hat, t0, ctx, cond=cond, cfg_drop=False)
-        x_rec = z_hat + u0_hat
-        loss_xrec = F.mse_loss(x_rec, x)
-
-        # ----- z cycle: z0 -> x_fake -> z_rec -----
-        z0 = torch.randn(B, D, device=device)
-        u0 = self.u_forward(z0, t0, ctx, cond=cond, cfg_drop=False)
-        x_fake = z0 + u0
-        z_rec = self.f_forward(x_fake, ctx, cond=cond, cfg_drop=False)
-        loss_zcycle = F.mse_loss(z_rec, z0)
-
-        # ----- Imbalance moment matching (RAW space) -----
-        loss_imb = torch.zeros((), device=device)
-        if (cfg.lambda_imb > 0) and self.has_scaler:
-            x_raw = self._denorm_torch(x)
-            xfake_raw = self._denorm_torch(x_fake)
-            a_real = self._abs_imb_from_raw(x_raw)
-            a_fake = self._abs_imb_from_raw(xfake_raw)
-
-            mean_real = a_real.mean()
-            mean_fake = a_fake.mean()
-            std_real = a_real.std(unbiased=False)
-            std_fake = a_fake.std(unbiased=False)
-
-            loss_imb = (mean_real - mean_fake).abs() + (std_real - std_fake).abs()
-
-        # ----- Short rollout consistency loss (normalized space) -----
-        loss_roll = torch.zeros((), device=device)
-        if (cfg.lambda_rollout > 0) and (cfg.rollout_K > 0) and (x_future is not None):
-            K = min(cfg.rollout_K, x_future.shape[1])
-            ctx_roll = ctx
-            losses = []
-            for i in range(K):
-                z = torch.randn(B, D, device=device)
-                u = self.u_forward(z, t0, ctx_roll, cond=cond, cfg_drop=True)
-                x_pred = z + u
-                losses.append(F.mse_loss(x_pred, x_future[:, i, :]))
-
-                x_to_ctx = x_pred.detach() if cfg.rollout_detach_ctx else x_pred
-                ctx_roll = torch.cat([ctx_roll[:, 1:, :], x_to_ctx.unsqueeze(1)], dim=1)
-            loss_roll = torch.stack(losses).mean()
-
-        total = (
-            cfg.lambda_mean * loss_mean
-            + cfg.lambda_xrec * loss_xrec
-            + cfg.lambda_zcycle * loss_zcycle
-            + cfg.lambda_prior * loss_prior
-            + cfg.lambda_imb * loss_imb
-            + cfg.lambda_rollout * loss_roll
-        )
-
-        logs = {
-            "loss_total": float(total.detach().cpu()),
-            "loss_mean": float(loss_mean.detach().cpu()),
-            "loss_xrec": float(loss_xrec.detach().cpu()),
-            "loss_zcycle": float(loss_zcycle.detach().cpu()),
-            "loss_prior": float(loss_prior.detach().cpu()),
-            "loss_imb": float(loss_imb.detach().cpu()),
-            "loss_roll": float(loss_roll.detach().cpu()),
-        }
-        return total, logs
+        loss = self.cfg.lambda_prior * prior + self.cfg.lambda_mean * mean + self.cfg.lambda_xrec * xrec + self.cfg.lambda_zcycle * zcycle
+        logs = {"prior": float(prior.detach().cpu()),
+                "mean": float(mean.detach().cpu()),
+                "xrec": float(xrec.detach().cpu()),
+                "zcycle": float(zcycle.detach().cpu()),
+                "loss": float(loss.detach().cpu())}
+        return loss, logs
 
     @torch.no_grad()
-    def sample(
-        self,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        guidance_scale: float = 1.0,
-    ) -> torch.Tensor:
-        """One-step sampling (1 NFE): x = z + u(z, t=0)."""
-        B = ctx.shape[0]
+    def sample(self, hist: torch.Tensor, cond: Optional[torch.Tensor] = None, steps: int = 1) -> torch.Tensor:
+        """Sample one step (steps=1) or few steps (Euler integrate)."""
         D = self.cfg.state_dim
-        device = ctx.device
-        z = torch.randn(B, D, device=device)
-        t0 = torch.zeros(B, 1, device=device)
+        B = hist.shape[0]
+        steps = int(max(1, steps))
+        z = torch.randn(B, D, device=hist.device)
 
-        if (self.cond_mlp is None) or (cond is None) or (guidance_scale == 1.0):
-            u = self.u_forward(z, t0, ctx, cond=cond, cfg_drop=False)
-        else:
-            u_cond = self.u_forward(z, t0, ctx, cond=cond, cfg_drop=False)
-            u_uncond = self.u_forward(z, t0, ctx, cond=torch.zeros_like(cond), cfg_drop=False)
-            u = u_uncond + guidance_scale * (u_cond - u_uncond)
+        # Preserve the original 1-step behavior exactly
+        if steps == 1:
+            t0 = torch.zeros(B, 1, device=hist.device)
+            u0 = self.u_forward(z, t0, hist, cond=cond)
+            x = z + u0
+            return x
 
-        x = z + u
-        if self.cfg.sample_clip and self.cfg.sample_clip > 0:
-            x = x.clamp(-self.cfg.sample_clip, self.cfg.sample_clip)
+        x = z
+        dt = 1.0 / float(steps)
+        for i in range(steps):
+            t = torch.full((B, 1), float(i) / float(steps), device=hist.device)
+            u = self.u_forward(x, t, hist, cond=cond)
+            x = x + dt * u
         return x
 
 
-# Backward compatibility: some old scripts may still import BiMeanFlowLOB
+# Backward-compatible alias
 BiMeanFlowLOB = LoBiFlow
 
-
-__all__ = [
-    "LoBiFlow",
-    "BiMeanFlowLOB",
-]
+__all__ = ["LoBiFlow", "BiMeanFlowLOB"]

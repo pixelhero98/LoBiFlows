@@ -2,13 +2,17 @@
 
 Baselines for LoBiFlows (for comparison in experiments).
 
-Contains:
-- LOBConfig: shared configuration
-- MLP: feed-forward utility
-- BiFlowLOB: conditional rectified-flow / flow-matching baseline (multi-step sampling)
-- BiFlowNFLOB: BiFlow-style Normalizing Flow baseline (NLL + reverse distillation)
+This module is designed for ICASSP-style experimental clarity:
+- `LoBiFlow` (OURS) lives in `lob_model.py`
+- All baselines live here.
 
-Main method (ours) lives in `lob_model.py` as LoBiFlow.
+Contains:
+- LOBConfig (shared config)
+- MLP utility
+- BiFlowLOB: conditional rectified flow / flow matching baseline (iterative sampling; NFE=steps)
+- BiFlowNFLOB: conditional normalizing flow + BiFlow-style distillation baseline (single-pass sampling)
+
+Note: Datasets/feature-map/metrics live in `lob_datasets.py`.
 """
 
 from __future__ import annotations
@@ -17,7 +21,6 @@ from dataclasses import dataclass
 from typing import Dict, List, Optional, Tuple
 
 import math
-
 import numpy as np
 import torch
 import torch.nn as nn
@@ -35,12 +38,11 @@ class LOBConfig:
 
     # Shared model width
     hidden_dim: int = 128
-    num_layers: int = 1  # (kept for backward compatibility; used by baselines)
     dropout: float = 0.1
 
     # Conditioning (optional)
     cond_dim: int = 0
-    cfg_dropout: float = 0.1
+    cfg_dropout: float = 0.1  # classifier-free guidance style drop for cond/context
 
     # Numerics
     eps: float = 1e-8
@@ -54,86 +56,57 @@ class LOBConfig:
     grad_clip: float = 1.0
 
     # -----------------------------
-    # Existing BiMeanFlow losses
+    # Dataset standardization
     # -----------------------------
-    lambda_mean: float = 1.0
-    lambda_xrec: float = 1.0
-    lambda_zcycle: float = 0.25
-    lambda_prior: float = 0.1
-
-    lambda_imb: float = 0.2
-    rollout_K: int = 4
-    lambda_rollout: float = 0.25
-    rollout_detach_ctx: bool = True
-    path: str = "linear"
-
-    # Optional: clip generated normalized params to limit AR drift (0 disables)
-    sample_clip: float = 0.0
-
-    # Dataset standardization (Mode A)
     standardize: bool = True
 
     # -----------------------------
-    # NEW: Context encoder upgrades
+    # Derived conditioning features (recommended for FI-2010)
     # -----------------------------
-    # ctx_encoder: "lstm" | "transformer" | "conv_ssm"
-    ctx_encoder: str = "transformer"
-    ctx_layers: int = 2
+    use_cond_features: bool = True
+    cond_depths: Tuple[int, ...] = (1, 3, 5, 10)
+    cond_vol_window: int = 50
+    cond_standardize: bool = True
+
+    # -----------------------------
+    # Context encoder upgrades
+    # -----------------------------
+    ctx_encoder: str = "transformer"   # "lstm" | "transformer"
     ctx_heads: int = 4
-    ctx_ff_mult: int = 4
-    ctx_kernel_size: int = 9  # for conv_ssm
-
-    # 1) A: use cross-attention conditioning over ctx tokens (instead of pooled ctx)
-    use_cross_attn: bool = True
-    cross_attn_heads: int = 4
-
-    # 3) A+B: encode each time step as level tokens; tie bid/ask weights
-    use_level_tokens: bool = True
-    bidask_tying: bool = True
-    level_layers: int = 1
-    level_heads: int = 4
-    level_ff_mult: int = 4  # MLP width inside level-transformer blocks
+    ctx_layers: int = 2
 
     # -----------------------------
-    # NEW: NF / BiFlow settings
+    # BiFlowLOB (rectified flow) settings
     # -----------------------------
-    flow_layers: int = 8
-    flow_scale_clip: float = 2.0  # bounds log-scale in coupling layers
+    ode_steps_default: int = 32
 
-    # 2) B: share coupling backbone between forward/reverse flows (heads remain separate)
+    # -----------------------------
+    # NF baseline settings
+    # -----------------------------
+    flow_layers: int = 6
+    flow_scale_clip: float = 2.0
     share_coupling_backbone: bool = True
 
-    # 2) C: use Fourier embedding for layer-position (depth) embedding
-    time_embedding: str = "fourier"  # "mlp" or "fourier"
-    time_fourier_dim: int = 64
-    time_max_freq: float = 16.0
-
-    # BiFlow-style distillation losses (reverse model)
-    lambda_recon: float = 1.0
-    lambda_hidden_align: float = 0.5
-    lambda_cycle_z: float = 0.1
-
+    # Derived: state dim (params per snapshot)
     @property
     def state_dim(self) -> int:
-        return 4 * self.levels
+        return 4 * int(self.levels)
 
 
 # -----------------------------
 # Small network utilities
 # -----------------------------
 class MLP(nn.Module):
-    """Plain 2-hidden-layer MLP."""
-
-    def __init__(self, in_dim: int, hidden: int, out_dim: int, dropout: float = 0.0):
+    def __init__(self, in_dim: int, hidden_dim: int, out_dim: int, dropout: float = 0.0):
         super().__init__()
         self.net = nn.Sequential(
-            nn.Linear(in_dim, hidden),
+            nn.Linear(in_dim, hidden_dim),
             nn.SiLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden, hidden),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.SiLU(),
             nn.Dropout(dropout),
-            nn.Linear(hidden, out_dim),
+            nn.Linear(hidden_dim, out_dim),
         )
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
@@ -141,535 +114,192 @@ class MLP(nn.Module):
 
 
 # -----------------------------
-# Baseline models
+# Conditioning helpers (shared)
 # -----------------------------
-class BiFlowLOB(nn.Module):
-    """Conditional rectified-flow model for L2 params (baseline)."""
+class FourierEmbedding(nn.Module):
+    """Fourier features for scalar t in [0,1]."""
+    def __init__(self, dim: int):
+        super().__init__()
+        half = dim // 2
+        self.register_buffer("freq", torch.exp(torch.linspace(math.log(1.0), math.log(1000.0), half)), persistent=False)
+        self.dim = dim
 
+    def forward(self, t: torch.Tensor) -> torch.Tensor:
+        # t: [B,1] or [B]
+        if t.dim() == 1:
+            t = t[:, None]
+        ang = t * self.freq[None, :] * 2.0 * math.pi
+        emb = torch.cat([torch.sin(ang), torch.cos(ang)], dim=-1)
+        if emb.shape[-1] < self.dim:
+            emb = F.pad(emb, (0, self.dim - emb.shape[-1]))
+        return emb
+
+
+class CondEmbedder(nn.Module):
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
-        D = cfg.state_dim
-
-        self.ctx_rnn = nn.LSTM(
-            input_size=D,
-            hidden_size=cfg.hidden_dim,
-            num_layers=cfg.num_layers,
-            batch_first=True,
-            dropout=cfg.dropout if cfg.num_layers > 1 else 0.0,
-        )
-
-        self.t_mlp = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
+        self.t_emb = FourierEmbedding(cfg.hidden_dim)
+        self.t_mlp = MLP(cfg.hidden_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
 
         if cfg.cond_dim > 0:
             self.cond_mlp = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
         else:
             self.cond_mlp = None
 
-        in_dim = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-        self.v_net = MLP(in_dim, cfg.hidden_dim, D, dropout=cfg.dropout)
+    def embed_t(self, t: torch.Tensor) -> torch.Tensor:
+        return self.t_mlp(self.t_emb(t))
 
-    def encode_ctx(self, ctx: torch.Tensor) -> torch.Tensor:
-        _, (h_n, _) = self.ctx_rnn(ctx)
-        return h_n[-1]  # [B, hidden_dim]
-
-    def forward(
-        self,
-        x_t: torch.Tensor,
-        t: torch.Tensor,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        cfg_drop: bool = False,
-    ) -> torch.Tensor:
-        B = x_t.shape[0]
-        ctx_emb = self.encode_ctx(ctx)
-        t_emb = self.t_mlp(t)
-        parts = [x_t, ctx_emb, t_emb]
-
-        if self.cond_mlp is not None:
-            assert cond is not None
-            if cfg_drop:
-                drop_mask = (torch.rand(B, device=cond.device) < self.cfg.cfg_dropout).float().unsqueeze(1)
-                cond_in = cond * (1.0 - drop_mask)
-            else:
-                cond_in = cond
-            parts.append(self.cond_mlp(cond_in))
-
-        return self.v_net(torch.cat(parts, dim=1))
-
-    def fm_loss(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        B, _ = x.shape
-        z = torch.randn_like(x)
-        t = torch.rand(B, 1, device=x.device)
-        x_t = (1.0 - t) * z + t * x
-        v_target = x - z
-        v_hat = self.forward(x_t, t, ctx, cond=cond, cfg_drop=True)
-        return F.mse_loss(v_hat, v_target)
-
-    @torch.no_grad()
-    def sample(
-        self,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        steps: int = 32,
-        guidance_scale: float = 1.0,
-    ) -> torch.Tensor:
-        device = ctx.device
-        B = ctx.shape[0]
-        D = self.cfg.state_dim
-        x = torch.randn(B, D, device=device)
-
-        dt = 1.0 / steps
-        for k in range(steps):
-            t = torch.full((B, 1), k * dt, device=device)
-            if (self.cond_mlp is None) or (cond is None) or (guidance_scale == 1.0):
-                v = self.forward(x, t, ctx, cond=cond, cfg_drop=False)
-            else:
-                v_cond = self.forward(x, t, ctx, cond=cond, cfg_drop=False)
-                v_uncond = self.forward(x, t, ctx, cond=torch.zeros_like(cond), cfg_drop=False)
-                v = v_uncond + guidance_scale * (v_cond - v_uncond)
-            x = x + dt * v
-
-        if self.cfg.sample_clip and self.cfg.sample_clip > 0:
-            x = x.clamp(-self.cfg.sample_clip, self.cfg.sample_clip)
-        return x
+    def embed_cond(self, cond: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
+        if self.cond_mlp is None or cond is None:
+            return None
+        return self.cond_mlp(cond)
 
 
 # -----------------------------
-# Baseline: BiFlow-style Normalizing Flow (NLL + distillation)
+# Context encoder (sequence -> tokens + pooled)
 # -----------------------------
-
-# -----------------------------
-# Our NF + BiFlow model
-# -----------------------------
-class FourierEmbedding(nn.Module):
-    """Fourier features for a scalar in [0, 1] (e.g., time / depth position)."""
-
-    def __init__(self, fourier_dim: int = 64, max_freq: float = 16.0):
-        super().__init__()
-        if fourier_dim % 2 != 0:
-            raise ValueError("fourier_dim must be even")
-        half = fourier_dim // 2
-        # log-spaced frequencies
-        freqs = torch.exp(torch.linspace(0.0, math.log(max_freq), half))
-        self.register_buffer("freqs", freqs, persistent=False)
-
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        # t: [B,1] or [B]
-        if t.dim() == 2:
-            t = t.squeeze(1)
-        # [B, half]
-        angles = 2.0 * math.pi * t[:, None] * self.freqs[None, :]
-        return torch.cat([torch.sin(angles), torch.cos(angles)], dim=1)
-
-
-class TimeConditioner(nn.Module):
-    """Embed a scalar t into hidden_dim."""
-
-    def __init__(self, cfg: LOBConfig):
-        super().__init__()
-        self.cfg = cfg
-        if cfg.time_embedding == "fourier":
-            self.fourier = FourierEmbedding(cfg.time_fourier_dim, cfg.time_max_freq)
-            self.proj = MLP(cfg.time_fourier_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
-        elif cfg.time_embedding == "mlp":
-            self.fourier = None
-            self.proj = MLP(1, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
-        else:
-            raise ValueError(f"Unknown time_embedding: {cfg.time_embedding}")
-
-    def forward(self, t: torch.Tensor) -> torch.Tensor:
-        if self.fourier is not None:
-            return self.proj(self.fourier(t))
-        return self.proj(t)
-
-
-# -----------------------------
-# Context encoders (with optional level-token encoding)
-# -----------------------------
-
-class LevelTokenEncoder(nn.Module):
-    """Encode one L2 snapshot vector [4L] as L tokens (per level) and pool.
-
-    If bidask_tying=True:
-      - embed ask-side (gap, logv) and bid-side (gap, logv) with the SAME small network,
-        then fuse them per level. This bakes in bid/ask symmetry and reduces params.
-    """
-
-    def __init__(self, cfg: LOBConfig):
-        super().__init__()
-        self.cfg = cfg
-        L = cfg.levels
-        H = cfg.hidden_dim
-
-        self.bidask_tying = cfg.bidask_tying
-
-        if self.bidask_tying:
-            self.side_mlp = nn.Sequential(
-                nn.Linear(2, H),
-                nn.SiLU(),
-                nn.Linear(H, H),
-            )
-            self.fuse = nn.Linear(2 * H, H)
-        else:
-            self.proj = nn.Linear(4, H)
-
-        # Small transformer over levels (within each time step)
-        if cfg.level_layers > 0:
-            enc_layer = nn.TransformerEncoderLayer(
-                d_model=H,
-                nhead=cfg.level_heads,
-                dim_feedforward=cfg.level_ff_mult * H if hasattr(cfg, "level_ff_mult") else 4 * H,
-                dropout=cfg.dropout,
-                batch_first=True,
-                activation="gelu",
-                norm_first=True,
-            )
-            self.level_enc = nn.TransformerEncoder(enc_layer, num_layers=cfg.level_layers)
-        else:
-            self.level_enc = None
-
-        self.out_norm = nn.LayerNorm(H)
-
-    def forward(self, x_seq: torch.Tensor) -> torch.Tensor:
-        """x_seq: [B, T, D] -> time tokens [B, T, H]."""
-        B, T, D = x_seq.shape
-        L = self.cfg.levels
-        if D != 4 * L:
-            raise ValueError("state_dim mismatch in LevelTokenEncoder")
-
-        # reshape: [B*T, L, 4]
-        xt = x_seq.reshape(B * T, L, 4)
-
-        if self.bidask_tying:
-            # ask: (gap_a, logv_a), bid: (gap_b, logv_b)
-            ask = xt[:, :, [0, 2]]  # [BT, L, 2]
-            bid = xt[:, :, [1, 3]]
-            ask_e = self.side_mlp(ask)
-            bid_e = self.side_mlp(bid)
-            lvl = self.fuse(torch.cat([ask_e, bid_e], dim=-1))  # [BT, L, H]
-        else:
-            lvl = self.proj(xt)  # [BT, L, H]
-
-        if self.level_enc is not None:
-            lvl = self.level_enc(lvl)
-
-        # pool across levels -> one token per time step
-        tok = lvl.mean(dim=1)  # [BT, H]
-        tok = self.out_norm(tok).reshape(B, T, -1)
-        return tok
-
-
-class BaseContextEncoder(nn.Module):
-    def forward(self, ctx: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        """Return (ctx_tokens, ctx_pooled):
-        - ctx_tokens: [B, T, H]
-        - ctx_pooled: [B, H]
-        """
-        raise NotImplementedError
-
-
-class LSTMContextEncoder(BaseContextEncoder):
+class LSTMContextEncoder(nn.Module):
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         D = cfg.state_dim
-        H = cfg.hidden_dim
-        self.use_level_tokens = cfg.use_level_tokens
-        self.level_tok = LevelTokenEncoder(cfg) if self.use_level_tokens else None
-
-        in_dim = H if self.use_level_tokens else D
-        self.rnn = nn.LSTM(
-            input_size=in_dim,
-            hidden_size=H,
-            num_layers=max(1, cfg.ctx_layers),
-            batch_first=True,
-            dropout=cfg.dropout if cfg.ctx_layers > 1 else 0.0,
-        )
+        self.rnn = nn.LSTM(D, cfg.hidden_dim, num_layers=1, batch_first=True)
 
     def forward(self, ctx: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.level_tok is not None:
-            ctx_in = self.level_tok(ctx)  # [B,T,H]
-        else:
-            ctx_in = ctx  # [B,T,D]
-        out, (h_n, _) = self.rnn(ctx_in)
-        pooled = h_n[-1]
+        # ctx: [B,T,D]
+        out, (h, _) = self.rnn(ctx)
+        pooled = h[-1]  # [B,H]
         return out, pooled
 
 
-class TransformerContextEncoder(BaseContextEncoder):
+class TransformerContextEncoder(nn.Module):
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         D = cfg.state_dim
-        H = cfg.hidden_dim
-        self.use_level_tokens = cfg.use_level_tokens
-        self.level_tok = LevelTokenEncoder(cfg) if self.use_level_tokens else None
-        self.in_proj = nn.Linear(D, H) if not self.use_level_tokens else None
-
+        self.in_proj = nn.Linear(D, cfg.hidden_dim)
+        self.pos = nn.Parameter(torch.zeros(1, cfg.history_len, cfg.hidden_dim))
         enc_layer = nn.TransformerEncoderLayer(
-            d_model=H,
+            d_model=cfg.hidden_dim,
             nhead=cfg.ctx_heads,
-            dim_feedforward=cfg.ctx_ff_mult * H,
+            dim_feedforward=4 * cfg.hidden_dim,
             dropout=cfg.dropout,
             batch_first=True,
             activation="gelu",
             norm_first=True,
         )
         self.enc = nn.TransformerEncoder(enc_layer, num_layers=cfg.ctx_layers)
-        self.out_norm = nn.LayerNorm(H)
+        self.out_norm = nn.LayerNorm(cfg.hidden_dim)
 
     def forward(self, ctx: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.level_tok is not None:
-            tok = self.level_tok(ctx)  # [B,T,H]
+        x = self.in_proj(ctx)
+        # handle variable history length (use last tokens)
+        if x.shape[1] != self.pos.shape[1]:
+            pos = F.interpolate(self.pos.transpose(1, 2), size=x.shape[1], mode="linear", align_corners=False).transpose(1, 2)
         else:
-            tok = self.in_proj(ctx)  # [B,T,H]
-        tok = self.enc(tok)
-        tok = self.out_norm(tok)
-        pooled = tok.mean(dim=1)
-        return tok, pooled
+            pos = self.pos
+        x = x + pos[:, -x.shape[1]:, :]
+        h = self.enc(x)
+        h = self.out_norm(h)
+        pooled = h[:, -1, :]
+        return h, pooled
 
 
-class ConvSSMContextEncoder(BaseContextEncoder):
-    """A lightweight SSM-inspired encoder using depthwise causal convolutions + gating.
-
-    This is NOT a full S4/Mamba implementation, but often provides similar benefits
-    (longer receptive field, stable training) without extra dependencies.
-    """
-
-    def __init__(self, cfg: LOBConfig):
-        super().__init__()
-        D = cfg.state_dim
-        H = cfg.hidden_dim
-        self.use_level_tokens = cfg.use_level_tokens
-        self.level_tok = LevelTokenEncoder(cfg) if self.use_level_tokens else None
-        self.in_proj = nn.Linear(D, H) if not self.use_level_tokens else None
-
-        k = max(3, int(cfg.ctx_kernel_size))
-        self.k = k
-        self.blocks = nn.ModuleList()
-        for _ in range(max(1, cfg.ctx_layers)):
-            self.blocks.append(
-                nn.ModuleDict(
-                    {
-                        "dwconv": nn.Conv1d(H, H, kernel_size=k, groups=H, padding=k - 1),
-                        "pw": nn.Linear(H, 2 * H),
-                        "out": nn.Linear(H, H),
-                        "ln": nn.LayerNorm(H),
-                        "drop": nn.Dropout(cfg.dropout),
-                    }
-                )
-            )
-        self.out_norm = nn.LayerNorm(H)
-
-    def forward(self, ctx: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        if self.level_tok is not None:
-            x = self.level_tok(ctx)  # [B,T,H]
-        else:
-            x = self.in_proj(ctx)  # [B,T,H]
-
-        # to conv: [B,H,T]
-        y = x.transpose(1, 2)
-        for blk in self.blocks:
-            res = y
-            h = blk["dwconv"](y)[:, :, : y.shape[2]]  # causal crop
-            h = h.transpose(1, 2)  # [B,T,H]
-            h = blk["ln"](h)
-            gate = blk["pw"](h)  # [B,T,2H]
-            a, b = gate.chunk(2, dim=-1)
-            h = torch.sigmoid(b) * F.silu(a)
-            h = blk["out"](h)
-            h = blk["drop"](h)
-            y = (res + h.transpose(1, 2))  # back to [B,H,T]
-        tok = self.out_norm(y.transpose(1, 2))
-        pooled = tok.mean(dim=1)
-        return tok, pooled
-
-
-def build_context_encoder(cfg: LOBConfig) -> BaseContextEncoder:
-    if cfg.ctx_encoder == "lstm":
+def build_context_encoder(cfg: LOBConfig) -> nn.Module:
+    if cfg.ctx_encoder.lower() == "lstm":
         return LSTMContextEncoder(cfg)
-    if cfg.ctx_encoder == "transformer":
+    if cfg.ctx_encoder.lower() == "transformer":
         return TransformerContextEncoder(cfg)
-    if cfg.ctx_encoder == "conv_ssm":
-        return ConvSSMContextEncoder(cfg)
-    raise ValueError(f"Unknown ctx_encoder: {cfg.ctx_encoder}")
-
-
-# -----------------------------
-# Conditioning helpers
-# -----------------------------
-
-class CondEmbedder(nn.Module):
-    def __init__(self, cfg: LOBConfig):
-        super().__init__()
-        self.cfg = cfg
-        if cfg.cond_dim > 0:
-            self.net = MLP(cfg.cond_dim, cfg.hidden_dim, cfg.hidden_dim, dropout=0.0)
-        else:
-            self.net = None
-
-    def forward(self, cond: Optional[torch.Tensor], B: int, device: torch.device, cfg_drop: bool) -> Optional[torch.Tensor]:
-        if self.net is None:
-            return None
-        assert cond is not None
-        if cfg_drop:
-            drop_mask = (torch.rand(B, device=device) < self.cfg.cfg_dropout).float().unsqueeze(1)
-            cond = cond * (1.0 - drop_mask)
-        return self.net(cond)
+    raise ValueError(f"Unknown ctx_encoder={cfg.ctx_encoder}")
 
 
 class CrossAttentionConditioner(nn.Module):
-    """Cross-attend from an input query to ctx tokens to build a conditioning vector."""
-
-    def __init__(self, cfg: LOBConfig, query_dim: int):
+    def __init__(self, cfg: LOBConfig):
         super().__init__()
-        H = cfg.hidden_dim
-        self.q_proj = nn.Linear(query_dim, H)
-        self.attn = nn.MultiheadAttention(H, cfg.cross_attn_heads, batch_first=True, dropout=cfg.dropout)
-        self.out = nn.Sequential(nn.LayerNorm(H), nn.Linear(H, H), nn.SiLU(), nn.Dropout(cfg.dropout))
+        self.q_proj = nn.Linear(cfg.hidden_dim, cfg.hidden_dim)
+        self.attn = nn.MultiheadAttention(cfg.hidden_dim, num_heads=cfg.ctx_heads, batch_first=True, dropout=cfg.dropout)
+        self.out = nn.Sequential(nn.Linear(cfg.hidden_dim, cfg.hidden_dim), nn.SiLU(), nn.LayerNorm(cfg.hidden_dim))
 
-    def forward(self, query: torch.Tensor, ctx_tokens: torch.Tensor) -> torch.Tensor:
-        # query: [B, query_dim]
-        q = self.q_proj(query).unsqueeze(1)  # [B,1,H]
-        # attn_output: [B,1,H]
-        attn_out, _ = self.attn(q, ctx_tokens, ctx_tokens, need_weights=False)
-        return self.out(attn_out.squeeze(1))
+    def forward(self, q: torch.Tensor, ctx_tokens: torch.Tensor) -> torch.Tensor:
+        # q: [B,H], ctx_tokens: [B,T,H]
+        qh = self.q_proj(q)[:, None, :]
+        out, _ = self.attn(qh, ctx_tokens, ctx_tokens, need_weights=False)
+        return self.out(out[:, 0, :])
 
 
 # -----------------------------
-# Conditional RealNVP components
+# Baseline 1: Rectified Flow / Flow Matching (BiFlowLOB)
 # -----------------------------
+class BiFlowLOB(nn.Module):
+    """Rectified flow / flow matching baseline.
 
-class CouplingBackbone(nn.Module):
-    """Backbone that maps (x_a, ctx, cond, pos) -> hidden features.
+    Trains a velocity field v(x_t,t|ctx,cond) so that
+      v_target = x - z  (linear path between z~N and x)
 
-    - If cfg.use_cross_attn: uses cross-attn over ctx tokens (requested 1A).
-    - Else: uses pooled ctx vector.
+    Sampling: Euler integrate for `steps` (NFE = steps).
     """
-
-    def __init__(self, cfg: LOBConfig, x_a_dim: int):
+    def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
-        H = cfg.hidden_dim
-        self.x_proj = nn.Linear(x_a_dim, H)
-        self.pos_proj = nn.Linear(H, H)
-        self.cond_proj = nn.Linear(H, H)
-        self.ctx_proj = nn.Linear(H, H)
+        D = cfg.state_dim
+        self.ctx_enc = build_context_encoder(cfg)
+        self.cond_emb = CondEmbedder(cfg)
+        self.use_cross_attn = True
+        self.cross = CrossAttentionConditioner(cfg)
+        self.x_proj = nn.Linear(D, cfg.hidden_dim)
 
-        self.use_cross_attn = cfg.use_cross_attn
-        self.cross = CrossAttentionConditioner(cfg, query_dim=x_a_dim) if self.use_cross_attn else None
+        v_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
+        self.v_net = MLP(v_in, cfg.hidden_dim, D, dropout=cfg.dropout)
 
-        # fused MLP
-        self.fuse = nn.Sequential(
-            nn.LayerNorm(H),
-            nn.Linear(H, H),
-            nn.SiLU(),
-            nn.Dropout(cfg.dropout),
-            nn.Linear(H, H),
-            nn.SiLU(),
-            nn.Dropout(cfg.dropout),
-        )
+    def _ctx(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+        ctx_tokens, ctx_pool = self.ctx_enc(hist)
+        t_e = self.cond_emb.embed_t(t)
+        c_e = self.cond_emb.embed_cond(cond)
+        q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
+        ctx = self.cross(q, ctx_tokens)
+        return ctx_tokens, ctx, c_e
 
-    def forward(
-        self,
-        x_a: torch.Tensor,
-        ctx_tokens: torch.Tensor,
-        ctx_pooled: torch.Tensor,
-        cond_emb: Optional[torch.Tensor],
-        pos_emb: torch.Tensor,
-    ) -> torch.Tensor:
-        # base query features
-        xh = self.x_proj(x_a)
+    def v_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        _, ctx, c_e = self._ctx(hist, x_t, t, cond)
+        t_e = self.cond_emb.embed_t(t)
+        pieces = [x_t, ctx, t_e]
+        if c_e is not None:
+            pieces.append(c_e)
+        return self.v_net(torch.cat(pieces, dim=-1))
 
-        if self.use_cross_attn:
-            ctxh = self.cross(x_a, ctx_tokens)
-        else:
-            ctxh = self.ctx_proj(ctx_pooled)
+    def fm_loss(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        B, D = x.shape
+        z = torch.randn_like(x)
+        t = torch.rand(B, 1, device=x.device)
+        x_t = (1 - t) * z + t * x
+        v_target = x - z
+        v_hat = self.v_forward(x_t, t, hist, cond=cond)
+        return F.mse_loss(v_hat, v_target)
 
-        ph = self.pos_proj(pos_emb)
-        if cond_emb is None:
-            ch = 0.0
-        else:
-            ch = self.cond_proj(cond_emb)
-
-        h = xh + ctxh + ph + ch
-        return self.fuse(h)
-
-
-class AffineCoupling(nn.Module):
-    """Conditional affine coupling: y_b = x_b * exp(s) + t."""
-
-    def __init__(self, cfg: LOBConfig, dim: int, mask: torch.Tensor, backbone: CouplingBackbone):
-        super().__init__()
-        self.cfg = cfg
-        self.dim = dim
-        self.register_buffer("mask", mask, persistent=False)
-        self.backbone = backbone
-
-        # Separate heads (forward vs reverse can share backbone but have different heads)
-        hidden = cfg.hidden_dim
-        self.s_head = nn.Linear(hidden, dim)
-        self.t_head = nn.Linear(hidden, dim)
-
-    def _st(self, h: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
-        # Bound log-scale for stability
-        s = torch.tanh(self.s_head(h)) * float(self.cfg.flow_scale_clip)
-        t = self.t_head(h)
-        return s, t
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        ctx_tokens: torch.Tensor,
-        ctx_pooled: torch.Tensor,
-        cond_emb: Optional[torch.Tensor],
-        pos_emb: torch.Tensor,
-        return_hidden: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        # masked split
-        x_a = x * self.mask
-        x_b = x * (1.0 - self.mask)
-
-        h = self.backbone(x_a, ctx_tokens, ctx_pooled, cond_emb, pos_emb)
-        s, t = self._st(h)
-
-        y_b = x_b * torch.exp(s) + t
-        y = x_a + y_b * (1.0 - self.mask)
-
-        logdet = (s * (1.0 - self.mask)).sum(dim=1)  # [B]
-        return y, logdet, (h if return_hidden else None)
-
-    def inverse(
-        self,
-        y: torch.Tensor,
-        ctx_tokens: torch.Tensor,
-        ctx_pooled: torch.Tensor,
-        cond_emb: Optional[torch.Tensor],
-        pos_emb: torch.Tensor,
-        return_hidden: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        y_a = y * self.mask
-        y_b = y * (1.0 - self.mask)
-
-        h = self.backbone(y_a, ctx_tokens, ctx_pooled, cond_emb, pos_emb)
-        s, t = self._st(h)
-
-        x_b = (y_b - t) * torch.exp(-s)
-        x = y_a + x_b * (1.0 - self.mask)
-
-        logdet = -(s * (1.0 - self.mask)).sum(dim=1)  # [B]
-        return x, logdet, (h if return_hidden else None)
+    @torch.no_grad()
+    def sample(self, hist: torch.Tensor, cond: Optional[torch.Tensor] = None, steps: int = 32) -> torch.Tensor:
+        D = self.cfg.state_dim
+        B = hist.shape[0]
+        x = torch.randn(B, D, device=hist.device)
+        steps = int(steps)
+        dt = 1.0 / float(steps)
+        for i in range(steps):
+            t = torch.full((B, 1), float(i) / float(steps), device=hist.device)
+            v = self.v_forward(x, t, hist, cond=cond)
+            x = x + dt * v
+        return x
 
 
+# -----------------------------
+# Baseline 2: NF + BiFlow-style distillation (BiFlowNFLOB)
+# -----------------------------
 class InvertiblePermutation(nn.Module):
     def __init__(self, dim: int, seed: int = 0):
         super().__init__()
-        g = torch.Generator()
-        g.manual_seed(seed)
-        perm = torch.randperm(dim, generator=g)
-        inv = torch.empty_like(perm)
-        inv[perm] = torch.arange(dim)
-        self.register_buffer("perm", perm, persistent=False)
-        self.register_buffer("inv", inv, persistent=False)
+        rng = np.random.default_rng(seed)
+        perm = rng.permutation(dim).astype(np.int64)
+        inv = np.argsort(perm).astype(np.int64)
+        self.register_buffer("perm", torch.from_numpy(perm), persistent=False)
+        self.register_buffer("inv", torch.from_numpy(inv), persistent=False)
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return x[:, self.perm]
@@ -678,246 +308,187 @@ class InvertiblePermutation(nn.Module):
         return x[:, self.inv]
 
 
-class ConditionalRealNVP(nn.Module):
-    """A stack of (permute + coupling) layers."""
+class CouplingBackbone(nn.Module):
+    def __init__(self, cfg: LOBConfig, x_a_dim: int):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(x_a_dim + cfg.hidden_dim * 2 + (cfg.hidden_dim if cfg.cond_dim > 0 else 0), cfg.hidden_dim),
+            nn.SiLU(),
+            nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+            nn.SiLU(),
+            nn.Linear(cfg.hidden_dim, cfg.hidden_dim),
+            nn.SiLU(),
+        )
 
-    def __init__(self, cfg: LOBConfig, dim: int, *, seed: int = 0, shared_backbones: Optional[List[CouplingBackbone]] = None):
+    def forward(self, x_a: torch.Tensor, ctx: torch.Tensor, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> torch.Tensor:
+        parts = [x_a, ctx, t_e]
+        if c_e is not None:
+            parts.append(c_e)
+        return self.net(torch.cat(parts, dim=-1))
+
+
+class AffineCoupling(nn.Module):
+    def __init__(self, cfg: LOBConfig, dim: int, mask: torch.Tensor, backbone: Optional[CouplingBackbone] = None):
         super().__init__()
         self.cfg = cfg
         self.dim = dim
-        self.time = TimeConditioner(cfg)
+        self.register_buffer("mask", mask, persistent=False)
+        a_dim = int(mask.sum().item())
+        b_dim = dim - a_dim
+        self.a_dim = a_dim
+        self.b_dim = b_dim
+        self.backbone = backbone if backbone is not None else CouplingBackbone(cfg, x_a_dim=a_dim)
+        self.to_s = nn.Linear(cfg.hidden_dim, b_dim)
+        self.to_t = nn.Linear(cfg.hidden_dim, b_dim)
 
+    def _split(self, x: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        x_a = x[:, self.mask.bool()]
+        x_b = x[:, (~self.mask.bool())]
+        return x_a, x_b
+
+    def _merge(self, x_a: torch.Tensor, x_b: torch.Tensor) -> torch.Tensor:
+        x = torch.empty(x_a.shape[0], self.dim, device=x_a.device, dtype=x_a.dtype)
+        x[:, self.mask.bool()] = x_a
+        x[:, (~self.mask.bool())] = x_b
+        return x
+
+    def forward(self, x: torch.Tensor, ctx: torch.Tensor, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        x_a, x_b = self._split(x)
+        h = self.backbone(x_a, ctx, t_e, c_e)
+        s = self.to_s(h).clamp(-self.cfg.flow_scale_clip, self.cfg.flow_scale_clip)
+        t = self.to_t(h)
+        y_b = x_b * torch.exp(s) + t
+        y = self._merge(x_a, y_b)
+        logdet = s.sum(dim=-1)
+        return y, logdet, h
+
+    def inverse(self, y: torch.Tensor, ctx: torch.Tensor, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        y_a, y_b = self._split(y)
+        h = self.backbone(y_a, ctx, t_e, c_e)
+        s = self.to_s(h).clamp(-self.cfg.flow_scale_clip, self.cfg.flow_scale_clip)
+        t = self.to_t(h)
+        x_b = (y_b - t) * torch.exp(-s)
+        x = self._merge(y_a, x_b)
+        logdet = (-s).sum(dim=-1)
+        return x, logdet, h
+
+
+class ConditionalRealNVP(nn.Module):
+    def __init__(self, cfg: LOBConfig, dim: int, seed: int = 0, shared_backbones: Optional[List[CouplingBackbone]] = None):
+        super().__init__()
+        self.cfg = cfg
+        self.dim = dim
         self.perms = nn.ModuleList()
         self.couplings = nn.ModuleList()
-
-        # alternating binary mask
-        base_mask = torch.zeros(dim)
-        base_mask[::2] = 1.0  # keep even indices as a
-        base_mask = base_mask.view(1, dim)
-
+        rng = np.random.default_rng(seed)
         for i in range(cfg.flow_layers):
-            self.perms.append(InvertiblePermutation(dim, seed=seed + i))
+            perm = InvertiblePermutation(dim, seed=seed + i)
+            self.perms.append(perm)
+            mask = torch.zeros(dim, dtype=torch.bool)
+            mask[rng.choice(dim, size=dim // 2, replace=False)] = True
+            backbone = shared_backbones[i] if shared_backbones is not None else None
+            self.couplings.append(AffineCoupling(cfg, dim, mask=mask, backbone=backbone))
 
-            # Use a different mask each layer by permuting base mask (helps mixing)
-            mask = base_mask.clone()
-            if i % 2 == 1:
-                mask = 1.0 - mask
-
-            x_a_dim = dim  # we keep x_a as full dim masked vector (simple, stable)
-            if shared_backbones is not None:
-                backbone = shared_backbones[i]
-            else:
-                backbone = CouplingBackbone(cfg, x_a_dim=x_a_dim)
-
-            self.couplings.append(AffineCoupling(cfg, dim=dim, mask=mask, backbone=backbone))
-
-    def _pos_emb(self, layer_idx: int, B: int, device: torch.device) -> torch.Tensor:
-        # depth position in [0,1]
-        t = torch.full((B, 1), float(layer_idx) / max(1, (self.cfg.flow_layers - 1)), device=device)
-        return self.time(t)
-
-    def forward(
-        self,
-        x: torch.Tensor,
-        ctx_tokens: torch.Tensor,
-        ctx_pooled: torch.Tensor,
-        cond_emb: Optional[torch.Tensor],
-        return_intermediates: bool = False,
-        return_hiddens: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
-        z = x
-        logdet = torch.zeros(z.shape[0], device=z.device)
-
-        states: List[torch.Tensor] = []
+    def forward(self, x: torch.Tensor, ctx: torch.Tensor, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, List[torch.Tensor], List[torch.Tensor]]:
         hiddens: List[torch.Tensor] = []
-        if return_intermediates:
-            states.append(z)
-
-        for i, (perm, coup) in enumerate(zip(self.perms, self.couplings)):
-            z = perm(z)
-            pos = self._pos_emb(i, z.shape[0], z.device)
-            z, ld, h = coup(z, ctx_tokens, ctx_pooled, cond_emb, pos, return_hidden=return_hiddens)
-            logdet = logdet + ld
-            if return_intermediates:
-                states.append(z)
-            if return_hiddens and (h is not None):
-                hiddens.append(h)
-
-        return z, logdet, (states if return_intermediates else None), (hiddens if return_hiddens else None)
-
-    def inverse(
-        self,
-        z: torch.Tensor,
-        ctx_tokens: torch.Tensor,
-        ctx_pooled: torch.Tensor,
-        cond_emb: Optional[torch.Tensor],
-        return_intermediates: bool = False,
-        return_hiddens: bool = False,
-    ) -> Tuple[torch.Tensor, torch.Tensor, Optional[List[torch.Tensor]], Optional[List[torch.Tensor]]]:
-        x = z
+        states: List[torch.Tensor] = [x]
         logdet = torch.zeros(x.shape[0], device=x.device)
+        z = x
+        for perm, coup in zip(self.perms, self.couplings):
+            z = perm(z)
+            z, ld, h = coup(z, ctx, t_e, c_e)
+            logdet = logdet + ld
+            hiddens.append(h)
+            states.append(z)
+        return z, logdet, states, hiddens
 
-        states: List[torch.Tensor] = []
+    def inverse(self, z: torch.Tensor, ctx: torch.Tensor, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, List[torch.Tensor], List[torch.Tensor]]:
         hiddens: List[torch.Tensor] = []
-        if return_intermediates:
-            states.append(x)
-
-        for i in reversed(range(len(self.couplings))):
-            perm = self.perms[i]
-            coup = self.couplings[i]
-            pos = self._pos_emb(i, x.shape[0], x.device)
-            x, ld, h = coup.inverse(x, ctx_tokens, ctx_pooled, cond_emb, pos, return_hidden=return_hiddens)
+        states: List[torch.Tensor] = [z]
+        logdet = torch.zeros(z.shape[0], device=z.device)
+        x = z
+        for perm, coup in reversed(list(zip(self.perms, self.couplings))):
+            x, ld, h = coup.inverse(x, ctx, t_e, c_e)
             x = perm.inverse(x)
             logdet = logdet + ld
-            if return_intermediates:
-                states.append(x)
-            if return_hiddens and (h is not None):
-                hiddens.append(h)
+            hiddens.append(h)
+            states.append(x)
+        return x, logdet, states, hiddens
 
-        return x, logdet, (states if return_intermediates else None), (hiddens if return_hiddens else None)
-
-
-# -----------------------------
-# NEW: BiFlow NF model (forward NLL + reverse distillation w/ hidden alignment)
-# -----------------------------
 
 class BiFlowNFLOB(nn.Module):
-    """Conditional NF + BiFlow-style hidden alignment.
-
-    Training recipe:
-      1) Train forward_flow with nll_loss (x -> z).
-      2) Freeze forward_flow.
-      3) Train reverse_flow with biflow_loss (z -> x) using forward trajectory alignment.
-
-    Sampling:
-      x ~ reverse_flow( z ~ N(0,I) )   (single pass; no iterative steps).
-    """
-
+    """NF baseline: forward NF trained with NLL; reverse NF trained with BiFlow-style hidden alignment."""
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
         D = cfg.state_dim
         self.ctx_enc = build_context_encoder(cfg)
         self.cond_emb = CondEmbedder(cfg)
+        self.cross = CrossAttentionConditioner(cfg)
+        self.x_proj = nn.Linear(D, cfg.hidden_dim)
 
-        # Optional backbone sharing between forward/reverse (requested 2B).
-        shared_backbones: Optional[List[CouplingBackbone]] = None
+        shared: Optional[List[CouplingBackbone]] = None
         if cfg.share_coupling_backbone:
-            shared_backbones = [CouplingBackbone(cfg, x_a_dim=D) for _ in range(cfg.flow_layers)]
+            shared = [CouplingBackbone(cfg, x_a_dim=D // 2) for _ in range(cfg.flow_layers)]
 
-        self.forward_flow = ConditionalRealNVP(cfg, dim=D, seed=0, shared_backbones=shared_backbones)
-        self.reverse_flow = ConditionalRealNVP(cfg, dim=D, seed=1337, shared_backbones=shared_backbones)
+        self.forward_flow = ConditionalRealNVP(cfg, dim=D, seed=0, shared_backbones=shared)
+        self.reverse_flow = ConditionalRealNVP(cfg, dim=D, seed=1337, shared_backbones=shared)
 
-        # Projection heads φ_i for hidden alignment (BiFlow style):
-        # reverse hidden h_i -> D to match forward intermediate state.
         self.align_heads = nn.ModuleList([MLP(cfg.hidden_dim, cfg.hidden_dim, D, dropout=0.0) for _ in range(cfg.flow_layers)])
-
-        self._forward_frozen: bool = False
+        self._forward_frozen = False
 
     def freeze_forward(self):
         for p in self.forward_flow.parameters():
             p.requires_grad_(False)
         self._forward_frozen = True
 
-    # ---- shared conditioning prep ----
+    def _prep(self, hist: torch.Tensor, x_ref: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
+        ctx_tokens, _ = self.ctx_enc(hist)
+        t0 = torch.zeros(x_ref.shape[0], 1, device=x_ref.device)
+        t_e = self.cond_emb.embed_t(t0)
+        c_e = self.cond_emb.embed_cond(cond)
+        q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
+        ctx = self.cross(q, ctx_tokens)
+        return ctx, t_e, c_e
 
-    def _prep(self, ctx: torch.Tensor, cond: Optional[torch.Tensor], cfg_drop: bool) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
-        B = ctx.shape[0]
-        ctx_tokens, ctx_pooled = self.ctx_enc(ctx)
-        ce = self.cond_emb(cond, B=B, device=ctx.device, cfg_drop=cfg_drop)
-        return ctx_tokens, ctx_pooled, ce
+    def log_prob(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        ctx, t_e, c_e = self._prep(hist, x, cond)
+        z, logdet, _, _ = self.forward_flow.forward(x, ctx, t_e, c_e)
+        base = -0.5 * (z**2).sum(dim=-1) - 0.5 * z.shape[-1] * math.log(2 * math.pi)
+        return base + logdet
 
-    # ---- forward / reverse helpers ----
+    def nll_loss(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
+        return (-self.log_prob(x, hist, cond)).mean()
 
-    def log_prob(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        ctx_tokens, ctx_pooled, ce = self._prep(ctx, cond, cfg_drop=False)
-        z, logdet, _, _ = self.forward_flow(x, ctx_tokens, ctx_pooled, ce, return_intermediates=False, return_hiddens=False)
-        # standard normal log prob
-        log_base = -0.5 * (z ** 2).sum(dim=1) - 0.5 * x.shape[1] * math.log(2.0 * math.pi)
-        return log_base + logdet
+    def biflow_loss(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> Tuple[torch.Tensor, Dict[str, float]]:
+        if not self._forward_frozen:
+            raise RuntimeError("Call freeze_forward() before training reverse with biflow_loss().")
 
-    def nll_loss(self, x: torch.Tensor, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        return (-self.log_prob(x, ctx, cond)).mean()
+        ctx, t_e, c_e = self._prep(hist, x, cond)
+
+        with torch.no_grad():
+            z, _, f_states, _ = self.forward_flow.forward(x, ctx, t_e, c_e)
+
+        x_hat, _, r_states, r_hid = self.reverse_flow.inverse(z, ctx, t_e, c_e)
+
+        rec = F.mse_loss(x_hat, x)
+        align = 0.0
+        # align reverse hidden (projected) to forward intermediate states
+        for i in range(self.cfg.flow_layers):
+            align = align + F.mse_loss(self.align_heads[i](r_hid[i]), f_states[i + 1])
+        align = align / float(self.cfg.flow_layers)
+
+        loss = rec + 0.5 * align
+        return loss, {"rec": float(rec.detach().cpu()), "align": float(align.detach().cpu())}
 
     @torch.no_grad()
-    def sample(self, ctx: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        B = ctx.shape[0]
+    def sample(self, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         D = self.cfg.state_dim
-        z = torch.randn(B, D, device=ctx.device)
-        ctx_tokens, ctx_pooled, ce = self._prep(ctx, cond, cfg_drop=False)
-        x, _, _, _ = self.reverse_flow.inverse(z, ctx_tokens, ctx_pooled, ce, return_intermediates=False, return_hiddens=False)
-        if self.cfg.sample_clip and self.cfg.sample_clip > 0:
-            x = x.clamp(-self.cfg.sample_clip, self.cfg.sample_clip)
+        B = hist.shape[0]
+        z = torch.randn(B, D, device=hist.device)
+        ctx, t_e, c_e = self._prep(hist, z, cond)
+        x, _, _, _ = self.reverse_flow.inverse(z, ctx, t_e, c_e)
         return x
-
-    # ---- BiFlow distillation loss for reverse model ----
-
-    def biflow_loss(
-        self,
-        x: torch.Tensor,
-        ctx: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-    ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        """Reverse distillation loss (use after calling freeze_forward()).
-
-        Loss = recon(x_hat, x) + hidden-align(φ_i(h_rev_i), state_fwd_i) + cycle-z
-        where state_fwd_i are forward intermediate states along x->z, and h_rev_i are
-        reverse coupling hidden features along z->x.
-        """
-        cfg = self.cfg
-        if not self._forward_frozen:
-            # You CAN train jointly, but BiFlow typically freezes forward for stable alignment.
-            pass
-
-        # Prep conditioning (no cfg-drop for teacher trajectory)
-        ctx_tokens, ctx_pooled, ce_teacher = self._prep(ctx, cond, cfg_drop=False)
-
-        # Forward teacher trajectory
-        with torch.no_grad():
-            z, _, states_fwd, _ = self.forward_flow(
-                x, ctx_tokens, ctx_pooled, ce_teacher, return_intermediates=True, return_hiddens=False
-            )
-            assert states_fwd is not None  # length = flow_layers+1
-
-        # Student reverse trajectory (allow cfg-drop)
-        ctx_tokens_s, ctx_pooled_s, ce_student = self._prep(ctx, cond, cfg_drop=True)
-        x_hat, _, states_rev, h_rev = self.reverse_flow.inverse(
-            z, ctx_tokens_s, ctx_pooled_s, ce_student, return_intermediates=True, return_hiddens=True
-        )
-
-        loss_recon = F.mse_loss(x_hat, x)
-
-        # Hidden alignment: match reverse hidden (projected) to forward intermediate states.
-        # Align layer i (0..K-1) to forward state at depth i+1 (after i-th coupling).
-        loss_align = torch.zeros((), device=x.device)
-        if (cfg.lambda_hidden_align > 0) and (h_rev is not None):
-            # reverse_flow.inverse returns hiddens in reverse order of layers executed.
-            # We want them ordered by increasing depth (0..K-1) to match forward states.
-            h_rev_ordered = list(reversed(h_rev))
-            K = min(len(h_rev_ordered), cfg.flow_layers)
-            errs = []
-            for i in range(K):
-                proj = self.align_heads[i](h_rev_ordered[i])  # [B,D]
-                tgt = states_fwd[i + 1].detach()              # [B,D]
-                errs.append(F.mse_loss(proj, tgt))
-            loss_align = torch.stack(errs).mean() if errs else loss_align
-
-        # Cycle-z: push x_hat back through frozen forward and match z (stabilizes reverse).
-        loss_cycle = torch.zeros((), device=x.device)
-        if cfg.lambda_cycle_z > 0:
-            with torch.no_grad():
-                ctx_tokens_t, ctx_pooled_t, ce_t = self._prep(ctx, cond, cfg_drop=False)
-            z_hat, _, _, _ = self.forward_flow(x_hat, ctx_tokens_t, ctx_pooled_t, ce_t, return_intermediates=False, return_hiddens=False)
-            loss_cycle = F.mse_loss(z_hat, z)
-
-        total = cfg.lambda_recon * loss_recon + cfg.lambda_hidden_align * loss_align + cfg.lambda_cycle_z * loss_cycle
-        logs = {
-            "loss_total": float(total.detach().cpu()),
-            "loss_recon": float(loss_recon.detach().cpu()),
-            "loss_hidden_align": float(loss_align.detach().cpu()),
-            "loss_cycle_z": float(loss_cycle.detach().cpu()),
-        }
-        return total, logs
 
 
 __all__ = [
