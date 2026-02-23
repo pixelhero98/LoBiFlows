@@ -28,10 +28,7 @@ import torch
 try:
     from Model.lob_baselines import LOBConfig  # type: ignore
 except ImportError:
-    try:
-        from lob_baselines import LOBConfig
-    except ImportError:  # backward compat
-        from lob_model import LOBConfig
+    from lob_baselines import LOBConfig
 
 
 ArrayLike = Union[np.ndarray, torch.Tensor]

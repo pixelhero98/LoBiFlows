@@ -3,14 +3,14 @@
 Training + evaluation utilities for L2 LOB generators.
 
 This file contains:
-- train_loop(): trains baseline models (BiMeanFlowLOB, BiFlowLOB) or our NF model (BiFlowNFLOB)
+- train_loop(): trains LoBiFlow (ours) and baselines (BiFlowLOB, BiFlowNFLOB)
 - generate_continuation(): autoregressive continuation in normalized space
 - eval_one_window(): decodes raw L2 and prints metrics real vs generated
 - eval_many_windows(): evaluates metrics over many random windows (recommended for paper figs)
 
 Models:
-  - Baselines: `lob_baselines.py`
-  - Ours:      `lob_model.py`
+  - Ours:      `lob_model.py` (LoBiFlow)
+  - Baselines: `lob_baselines.py` (BiFlowLOB, BiFlowNFLOB)
 
 Datasets/feature map/metrics: `lob_datasets.py`
 """
@@ -23,22 +23,22 @@ import numpy as np
 import torch
 from torch.utils.data import DataLoader
 
-# Models (baselines + ours)
+# Models (ours + baselines)
+# Ours: LoBiFlow (main method)
 try:
-    from Model.lob_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB  # type: ignore
+    from Model.lob_model import LoBiFlow  # type: ignore
 except ImportError:
     try:
-        from lob_baselines import LOBConfig, BiMeanFlowLOB, BiFlowLOB
+        from lob_model import LoBiFlow
     except ImportError:  # backward compat
-        from lob_model import LOBConfig, BiMeanFlowLOB, BiFlowLOB
+        from lob_model import BiMeanFlowLOB as LoBiFlow  # type: ignore
 
+# Baselines
 try:
-    from Model.lob_model import BiFlowNFLOB  # type: ignore
+    from Model.lob_baselines import LOBConfig, BiFlowLOB, BiFlowNFLOB  # type: ignore
 except ImportError:
-    try:
-        from lob_model import BiFlowNFLOB
-    except ImportError:
-        BiFlowNFLOB = None  # type: ignore
+    from lob_baselines import LOBConfig, BiFlowLOB, BiFlowNFLOB
+
 
 try:
     from Model.lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics  # type: ignore
@@ -83,7 +83,7 @@ def _parse_batch(batch, cfg: LOBConfig):
 def train_loop(
     ds: WindowedLOBParamsDataset,
     cfg: LOBConfig,
-    model_name: str = "bimean",
+    model_name: str = "lobiflow",
     steps: int = 3000,
     log_every: int = 200,
     nf_stage: str = "forward",
@@ -91,9 +91,9 @@ def train_loop(
 ) -> torch.nn.Module:
     """
     model_name:
-      - "bimean"     -> BiMeanFlowLOB (1-step sampling baseline)
-      - "biflow"     -> BiFlowLOB (multi-step sampling baseline)
-      - "biflow_nf"  -> BiFlowNFLOB (ours; conditional Normalizing Flow + BiFlow distillation)
+      - "lobiflow"   -> LoBiFlow (OURS; fast sampler, supports variable NFE via steps)
+      - "biflow"     -> BiFlowLOB (baseline; rectified-flow, multi-step)
+      - "biflow_nf"  -> BiFlowNFLOB (baseline; NF with NLL + distillation; 1-pass sampling)
 
     For model_name=="biflow_nf", use nf_stage:
       - "forward":   train forward NF with NLL (x->z)
@@ -110,8 +110,8 @@ def train_loop(
     # -------------------------
     # Model + optimizer
     # -------------------------
-    if model_name == "bimean":
-        model = BiMeanFlowLOB(cfg).to(device)
+    if model_name in {"lobiflow", "ours", "bimean"}:
+        model = LoBiFlow(cfg).to(device)
         if ds.is_standardized:
             model.set_scaler(ds.params_mean, ds.params_std)
         opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
@@ -121,8 +121,6 @@ def train_loop(
         opt = torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     elif model_name == "biflow_nf":
-        if BiFlowNFLOB is None:
-            raise ImportError("BiFlowNFLOB not found. Ensure lob_model.py is available on PYTHONPATH.")
         model = BiFlowNFLOB(cfg).to(device)
 
         if steps_reverse is None:
@@ -136,7 +134,7 @@ def train_loop(
             opt = torch.optim.AdamW(model.forward_flow.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
     else:
-        raise ValueError("model_name must be 'bimean', 'biflow', or 'biflow_nf'")
+        raise ValueError("model_name must be 'lobiflow', 'biflow', or 'biflow_nf'")
 
     # -------------------------
     # Training stage 1
@@ -160,7 +158,7 @@ def train_loop(
 
         opt.zero_grad(set_to_none=True)
 
-        if model_name == "bimean":
+        if model_name in {"lobiflow", "ours", "bimean"}:
             loss, logs = model.loss(tgt, hist, cond=cond, x_future=fut)
 
         elif model_name == "biflow":
@@ -180,9 +178,9 @@ def train_loop(
         opt.step()
 
         if (step % log_every) == 0 or step == 1:
-            if model_name == "bimean":
+            if model_name in {"lobiflow", "ours", "bimean"}:
                 print(
-                    f"step {step:5d} | total {logs['loss_total']:.4f} | mean {logs['loss_mean']:.4f} | "
+                    f"step {step:5d} | lobiflow_total {logs['loss_total']:.4f} | mean {logs['loss_mean']:.4f} | "
                     f"xrec {logs['loss_xrec']:.4f} | zcyc {logs['loss_zcycle']:.4f} | prior {logs['loss_prior']:.4f} | "
                     f"imb {logs['loss_imb']:.4f} | roll {logs['loss_roll']:.4f}"
                 )
@@ -242,10 +240,15 @@ def generate_continuation(
     cfg: LOBConfig,
     idx: int,
     horizon: int = 200,
-    model_name: str = "bimean",
-    ode_steps: int = 32,
+    model_name: str = "lobiflow",
+    nfe: int = 1,
+    ode_steps: Optional[int] = None,
 ):
     """Autoregressive continuation of length `horizon` from ds[idx] history.
+
+    nfe: number of function evaluations used for sampling steps.
+         - LoBiFlow and BiFlowLOB use nfe as Euler steps.
+         - BiFlowNFLOB ignores nfe (single-pass flow).
 
     Returns:
       hist_norm: [H,D] normalized
@@ -253,6 +256,9 @@ def generate_continuation(
       meta: dict (contains init_mid_for_window)
     """
     device = next(model.parameters()).device
+    if ode_steps is not None:
+        nfe = int(ode_steps)
+    nfe = int(max(1, nfe))
     item = ds[idx]
 
     # Unpack (history, target, [future], [cond], meta)
@@ -276,12 +282,12 @@ def generate_continuation(
 
     gen = []
     for _ in range(horizon):
-        if model_name == "bimean":
-            x_next = model.sample(ctx, cond=cond_b)  # [1,D]
+        if model_name in {"lobiflow", "ours", "bimean"}:
+            x_next = model.sample(ctx, cond=cond_b, steps=nfe)  # [1,D]
         elif model_name == "biflow":
-            x_next = model.sample(ctx, cond=cond_b, steps=ode_steps)  # [1,D]
+            x_next = model.sample(ctx, cond=cond_b, steps=nfe)  # [1,D]
         else:  # biflow_nf
-            x_next = model.sample(ctx, cond=cond_b)  # [1,D]
+            x_next = model.sample(ctx, cond=cond_b)  # [1,D] (nfe ignored)
 
         gen.append(x_next.squeeze(0).detach().cpu())
         ctx = torch.cat([ctx[:, 1:, :], x_next.unsqueeze(1)], dim=1)
@@ -296,7 +302,7 @@ def eval_one_window(
     model: torch.nn.Module,
     cfg: LOBConfig,
     horizon: int = 200,
-    model_name: str = "bimean",
+    model_name: str = "lobiflow",
     ode_steps: int = 32,
     idx: Optional[int] = None,
 ) -> Tuple[Dict[str, float], Dict[str, float]]:
@@ -319,7 +325,7 @@ def eval_one_window(
 
     # Generated continuation
     hist_norm, gen_norm, meta = generate_continuation(
-        model, ds, cfg, idx=idx, horizon=horizon, model_name=model_name, ode_steps=ode_steps
+        model, ds, cfg, idx=idx, horizon=horizon, model_name=model_name, nfe=nfe, nfe=nfe, ode_steps=ode_steps
     )
     hist_raw = ds.denorm(hist_norm)
     gen_raw = ds.denorm(gen_norm)
@@ -350,7 +356,7 @@ def eval_many_windows(
     model: torch.nn.Module,
     cfg: LOBConfig,
     horizon: int = 200,
-    model_name: str = "bimean",
+    model_name: str = "lobiflow",
     ode_steps: int = 32,
     n_windows: int = 100,
     seed: int = 0,
@@ -376,7 +382,7 @@ def eval_many_windows(
         real_raw = ds.denorm(real_norm)
 
         hist_norm, gen_norm, meta = generate_continuation(
-            model, ds, cfg, idx=idx, horizon=horizon, model_name=model_name, ode_steps=ode_steps
+            model, ds, cfg, idx=idx, horizon=horizon, model_name=model_name, nfe=nfe, nfe=nfe, ode_steps=ode_steps
         )
         hist_raw = ds.denorm(hist_norm)
         gen_raw = ds.denorm(gen_norm)
@@ -405,3 +411,37 @@ def eval_many_windows(
         g = summary["gen"][k]
         print(f"{k:>14s} | real {r['mean']:.6g}±{r['std']:.3g} | gen {g['mean']:.6g}±{g['std']:.3g}")
     return summary
+
+
+def eval_many_windows_nfe(
+    ds: WindowedLOBParamsDataset,
+    model: torch.nn.Module,
+    cfg: LOBConfig,
+    *,
+    nfe_list,
+    horizon: int = 200,
+    model_name: str = "lobiflow",
+    n_windows: int = 100,
+    seed: int = 0,
+    ode_steps: Optional[int] = None,  # kept for backward compatibility
+) -> Dict[int, Dict[str, Dict[str, float]]]:
+    """Evaluate the same model across multiple NFE values.
+
+    Returns:
+        results[nfe] = summary dict returned by eval_many_windows()
+    """
+    results: Dict[int, Dict[str, Dict[str, float]]] = {}
+    for nfe in list(nfe_list):
+        nfe_i = int(nfe)
+        results[nfe_i] = eval_many_windows(
+            ds,
+            model,
+            cfg,
+            horizon=horizon,
+            model_name=model_name,
+            nfe=nfe_i,
+            ode_steps=ode_steps,
+            n_windows=n_windows,
+            seed=seed,
+        )
+    return results
