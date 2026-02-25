@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """experiments_icassp.py
 
-End-to-end ICASSP experiment runner for LoBiFlows-style LOB generation.
+End-to-end experiment runner for LoBiFlows-style LOB generation.
 
 Produces:
 A) Main quantitative evaluation (real-vs-real metrics) JSON
