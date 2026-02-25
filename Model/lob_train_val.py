@@ -2,7 +2,7 @@
 
 Training + evaluation utilities for LoBiFlows.
 
-Adds ICASSP-oriented evaluation helpers:
+Adds evaluation helpers:
 - Real-vs-real comparison metrics (distribution + temporal + validity)
 - Horizon-wise rollout stability
 - NFE speed/quality benchmarking
