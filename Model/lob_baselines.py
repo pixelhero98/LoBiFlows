@@ -44,6 +44,15 @@ class LOBConfig:
     cond_dim: int = 0
     cfg_dropout: float = 0.1  # classifier-free guidance style drop for cond/context
 
+    # LoBiFlow loss weights (ours)
+    lambda_prior: float = 1.0
+    lambda_mean: float = 1.0
+    lambda_xrec: float = 1.0
+    lambda_zcycle: float = 0.1
+
+    # Optional: conditional Gaussian prior over z (helps 1-NFE)
+    conditional_prior: bool = False
+
     # Numerics
     eps: float = 1e-8
     device: torch.device = torch.device("cuda" if torch.cuda.is_available() else "cpu")

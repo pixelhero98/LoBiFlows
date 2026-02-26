@@ -30,6 +30,7 @@ import numpy as np
 from lob_baselines import LOBConfig
 from lob_datasets import (
     build_dataset_splits_from_fi2010,
+    build_dataset_splits_from_npz_l2,
     build_dataset_splits_synthetic,
 )
 from lob_train_val import (
@@ -136,6 +137,18 @@ def _build_splits(args: argparse.Namespace, cfg: LOBConfig):
             path=args.data_path,
             cfg=cfg,
             layout=args.layout,
+            stride_train=args.stride_train,
+            stride_eval=args.stride_eval,
+            train_frac=args.train_frac,
+            val_frac=args.val_frac,
+            test_frac=args.test_frac,
+        )
+    elif args.dataset == "npz_l2":
+        if not args.data_path:
+            raise ValueError("--data_path is required when --dataset npz_l2 (prepared NPZ)")
+        splits = build_dataset_splits_from_npz_l2(
+            path=args.data_path,
+            cfg=cfg,
             stride_train=args.stride_train,
             stride_eval=args.stride_eval,
             train_frac=args.train_frac,
@@ -420,8 +433,8 @@ def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Run ICASSP experiment suite (A/B/C/D)")
 
     # Dataset
-    ap.add_argument("--dataset", type=str, default="synthetic", choices=["synthetic", "fi2010"])
-    ap.add_argument("--data_path", type=str, default="", help="Path to FI-2010-like array (.npy/.npz/.csv) if dataset=fi2010")
+    ap.add_argument("--dataset", type=str, default="synthetic", choices=["synthetic", "fi2010", "npz_l2"])
+    ap.add_argument("--data_path", type=str, default="", help="Path to dataset file. For fi2010: FI-2010-like array (.npy/.npz/.csv). For npz_l2: standardized prepared L2 NPZ (see lob_prepare_dataset.py).")
     ap.add_argument("--layout", type=str, default="auto", help="FI-2010-like layout (default: auto)")
     ap.add_argument("--synthetic_length", type=int, default=50000)
 

@@ -343,6 +343,25 @@ def load_fi2010_like_array(path: str) -> np.ndarray:
     return x.astype(np.float32)
 
 
+def load_l2_npz(path: str) -> Dict[str, np.ndarray]:
+    """Load a standardized L2 snapshot NPZ prepared by `lob_prepare_dataset.py`.
+
+    Required keys:
+      - ask_p, ask_v, bid_p, bid_v : [T,L] float arrays
+
+    Optional keys:
+      - mids : [T] float32
+      - params_raw : [T,4L] float32
+      - ts : [T] timestamps
+    """
+    data = np.load(path, allow_pickle=True)
+    out = {k: data[k] for k in data.files}
+    for k in ("ask_p", "ask_v", "bid_p", "bid_v", "mids", "params_raw"):
+        if k in out:
+            out[k] = out[k].astype(np.float32)
+    return out
+
+
 def _build_windowed_dataset(params_raw: np.ndarray, mids: np.ndarray, cfg: LOBConfig, stride: int) -> WindowedLOBParamsDataset:
     """Original single-dataset builder (kept for backward compatibility)."""
     # params
@@ -661,6 +680,52 @@ def build_dataset_splits_from_arrays(
     return {"train": ds_train, "val": ds_val, "test": ds_test, "stats": stats}
 
 
+
+def build_dataset_splits_from_npz_l2(
+    path: str,
+    cfg: LOBConfig,
+    *,
+    stride_train: int = 1,
+    stride_eval: int = 1,
+    train_frac: float = 0.7,
+    val_frac: float = 0.1,
+    test_frac: Optional[float] = None,
+    train_end: Optional[int] = None,
+    val_end: Optional[int] = None,
+) -> Dict[str, object]:
+    """Chronological split for a *preprocessed* standardized L2 NPZ file.
+
+    For datasets that are not off-the-shelf (exchange dumps, Kaggle files, etc.),
+    first convert them to the standardized NPZ using `lob_prepare_dataset.py`.
+    """
+    fm = L2FeatureMap(cfg.levels, cfg.eps)
+    data = load_l2_npz(path)
+
+    if "params_raw" in data and "mids" in data:
+        params_raw = data["params_raw"]
+        mids = data["mids"]
+    else:
+        for k in ("ask_p", "ask_v", "bid_p", "bid_v"):
+            if k not in data:
+                raise ValueError(f"NPZ missing required key '{k}'.")
+        ask_p, ask_v, bid_p, bid_v = data["ask_p"], data["ask_v"], data["bid_p"], data["bid_v"]
+        if ask_p.shape[1] != cfg.levels:
+            raise ValueError(f"Levels mismatch: file L={ask_p.shape[1]}, cfg.levels={cfg.levels}")
+        params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
+
+    return build_dataset_splits_from_arrays(
+        params_raw=params_raw,
+        mids=mids,
+        cfg=cfg,
+        stride_train=stride_train,
+        stride_eval=stride_eval,
+        train_frac=train_frac,
+        val_frac=val_frac,
+        test_frac=test_frac,
+        train_end=train_end,
+        val_end=val_end,
+    )
+
 def build_dataset_splits_from_fi2010(
     path: str,
     cfg: LOBConfig,
@@ -771,10 +836,12 @@ __all__ = [
     "build_dataset_from_fi2010",
     "build_dataset_synthetic",
     "build_dataset_splits_from_arrays",
+    "build_dataset_splits_from_npz_l2",
     "build_dataset_splits_from_fi2010",
     "build_dataset_splits_synthetic",
     "standardize_params",
     "standardize_cond",
+    "load_l2_npz",
     "fit_standardizer",
     "apply_standardizer",
     "build_cond_features",
