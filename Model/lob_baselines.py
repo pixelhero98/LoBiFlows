@@ -280,7 +280,7 @@ class BiFlowLOB(nn.Module):
         D = self.cfg.state_dim
         B = hist.shape[0]
         x = torch.randn(B, D, device=hist.device)
-        steps = int(steps)
+        steps = int(max(1, steps))
         dt = 1.0 / float(steps)
         for i in range(steps):
             t = torch.full((B, 1), float(i) / float(steps), device=hist.device)

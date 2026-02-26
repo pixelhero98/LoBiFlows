@@ -495,11 +495,13 @@ def eval_one_window(
     # Decode to raw L2
     fm = L2FeatureMap(cfg.levels, cfg.eps)
 
-    # IMPORTANT FIX: continuation starts at absolute t0, so decode with mids[t0] (not mids[t0-H])
-    init_mid_t0 = float(ds.mids[t0])
+    # decode deltas against the previous mid: first row uses mids[t0-1]
+    if t0 <= 0:
+        raise ValueError("t0 must be >= 1 to decode delta-mid trajectories.")
+    init_mid_prev = float(ds.mids[t0 - 1])
 
-    ask_p_g, ask_v_g, bid_p_g, bid_v_g = fm.decode_sequence(gen_raw_params, init_mid=init_mid_t0)
-    ask_p_r, ask_v_r, bid_p_r, bid_v_r = fm.decode_sequence(true_raw_params, init_mid=init_mid_t0)
+    ask_p_g, ask_v_g, bid_p_g, bid_v_g = fm.decode_sequence(gen_raw_params, init_mid=init_mid_prev)
+    ask_p_r, ask_v_r, bid_p_r, bid_v_r = fm.decode_sequence(true_raw_params, init_mid=init_mid_prev)
 
     cmp_metrics = compare_l2_sequences(
         gen_params=gen_raw_params,
@@ -524,7 +526,7 @@ def eval_one_window(
         "meta": {
             "t": int(t0),
             "init_mid_for_window": float(meta["init_mid_for_window"]),
-            "init_mid_t0": float(init_mid_t0),
+            "init_mid_prev": float(init_mid_prev),
         },
     }
 
@@ -805,7 +807,7 @@ def save_qualitative_window_npz(
         true_ask_p=seq["true"]["ask_p"], true_ask_v=seq["true"]["ask_v"],
         true_bid_p=seq["true"]["bid_p"], true_bid_v=seq["true"]["bid_v"],
         meta_t=np.int64(meta["t"]),
-        meta_init_mid_t0=np.float32(meta["init_mid_t0"]),
+        meta_init_mid_prev=np.float32(meta["init_mid_prev"]),
         horizon=np.int64(horizon),
         nfe=np.int64(nfe),
     )
