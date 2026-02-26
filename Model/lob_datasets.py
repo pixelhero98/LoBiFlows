@@ -92,7 +92,13 @@ class L2FeatureMap:
         return params, mid.astype(np.float32)
 
     def decode_sequence(self, params: np.ndarray, init_mid: float) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Decode params to raw L2 arrays using an initial mid for the window."""
+        """Decode params to raw L2 arrays using the mid immediately before the window.
+
+        Notes
+        -----
+        `delta_mid[t]` is interpreted as `mid[t] - mid[t-1]`. Therefore, `init_mid`
+        should be the previous mid (at t-1 for the first decoded row).
+        """
         T, D = params.shape
         L = self.L
         assert D == 4 * L, f"Expected D={4*L}, got {D}"
@@ -105,9 +111,10 @@ class L2FeatureMap:
         log_bid_v = params[:, 2 + 2 * (L - 1) + L :]
 
         mid = np.zeros(T, dtype=np.float32)
-        mid[0] = float(init_mid)
-        for t in range(1, T):
-            mid[t] = mid[t - 1] + delta_mid[t]
+        prev_mid = float(init_mid)
+        for t in range(T):
+            prev_mid = prev_mid + float(delta_mid[t])
+            mid[t] = prev_mid
 
         spread = np.exp(log_spread)
         ask1 = mid + 0.5 * spread
