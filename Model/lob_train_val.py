@@ -36,8 +36,19 @@ def seed_all(seed: int = 0):
     torch.cuda.manual_seed_all(seed)
 
 
-def make_loader(ds: WindowedLOBParamsDataset, batch_size: int, shuffle: bool = True, num_workers: int = 0) -> DataLoader:
-    return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, drop_last=True)
+def make_loader(
+    ds: WindowedLOBParamsDataset,
+    batch_size: int,
+    shuffle: bool = True,
+    num_workers: int = 0,
+    drop_last: bool = False,
+) -> DataLoader:
+    """Build a DataLoader with safe defaults for small split sizes.
+
+    `drop_last=False` avoids creating an empty loader when len(ds) < batch_size,
+    which would otherwise cause training loops to fail with repeated StopIteration.
+    """
+    return DataLoader(ds, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers, drop_last=drop_last)
 
 
 def _parse_batch(batch):
@@ -91,7 +102,12 @@ def train_loop(
         - "biflow"       : train reverse flow with biflow_loss (requires freeze_forward())
     """
     device = cfg.device
-    loader = make_loader(ds, cfg.batch_size, shuffle=shuffle)
+    loader = make_loader(ds, cfg.batch_size, shuffle=shuffle, drop_last=False)
+    if len(loader) == 0:
+        raise ValueError(
+            "Training loader is empty. Check dataset construction, history_len, "
+            "split boundaries, and batch_size."
+        )
 
     model_name = model_name.lower()
     if model is None:
