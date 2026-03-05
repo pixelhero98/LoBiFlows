@@ -8,12 +8,6 @@ LoBiFlow is a 1-NFE (and few-NFE) generator built on:
 - One-step sampling: x = z + u(z, t=0, ...)
 - Few-step sampling: Euler integrate dx/dt = u(x,t,...) for NFE steps
 
-Architecture improvements (v2):
-- FiLM-style conditioning: scale+shift modulation for t/cond instead of concatenation
-- Multi-scale context: average-pool + cross-attention for multi-resolution history view
-- ResMLP: residual MLP with skip connections for gradient health
-- Improved prior: proper KL divergence loss when conditional_prior=True
-
 This file intentionally contains ONLY our method.
 Baselines are in `lob_baselines.py`.
 """
