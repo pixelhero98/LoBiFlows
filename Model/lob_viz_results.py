@@ -15,16 +15,7 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
-    out: Dict[str, float] = {}
-    for k, v in d.items():
-        kk = f"{prefix}.{k}" if prefix else str(k)
-        if isinstance(v, dict):
-            out.update(_flatten(v, kk))
-        elif isinstance(v, (int, float, np.floating, np.integer, bool)):
-            out[kk] = float(v)
-    return out
+from lob_utils import flatten_dict as _flatten, microstructure_series
 
 
 def _load_json(path: str) -> Any:
@@ -113,12 +104,7 @@ def plot_rollout_stability(rollout_results: Dict[str, Any], output_path: str):
 
 
 def _series_from_book(ask_p, ask_v, bid_p, bid_v):
-    eps = 1e-8
-    mid = 0.5 * (ask_p[:, 0] + bid_p[:, 0])
-    spread = ask_p[:, 0] - bid_p[:, 0]
-    depth = ask_v.sum(axis=1) + bid_v.sum(axis=1)
-    imb = (bid_v.sum(axis=1) - ask_v.sum(axis=1)) / (depth + eps)
-    return {"mid": mid, "spread": spread, "depth": depth, "imb": imb}
+    return microstructure_series(ask_p, ask_v, bid_p, bid_v)
 
 
 def plot_qualitative(npz_path: str, output_path: str, levels_to_show: int = 5):

@@ -25,6 +25,7 @@ from torch.utils.data import DataLoader
 from lob_baselines import LOBConfig, BiFlowLOB, BiFlowNFLOB
 from lob_model import LoBiFlow
 from lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics
+from lob_utils import flatten_dict, unflatten_to_nested, microstructure_series
 
 
 # -----------------------------
@@ -57,13 +58,17 @@ def _parse_batch(batch):
       - (hist, tgt, cond, meta)
       - (hist, tgt, fut, meta)
       - (hist, tgt, fut, cond, meta)
+
+    Note: When len(batch)==4, we disambiguate fut vs cond by ndim:
+    cond is [B,C] (dim=2), fut is [B,H_fut,D] (dim=3).
+    This BREAKS if future_horizon==1 (fut would be [B,D], dim=2).
+    Currently safe because future_horizon=0 throughout.
     """
     if len(batch) == 3:
         hist, tgt, meta = batch
         return hist, tgt, None, None, meta
     if len(batch) == 4:
         hist, tgt, a, meta = batch
-        # a is either fut or cond; disambiguate by ndim (batched cond => [B,C] => dim=2)
         if a.dim() == 2:
             return hist, tgt, None, a, meta
         return hist, tgt, a, None, meta
@@ -81,6 +86,24 @@ def _torch_sync(device: torch.device):
 # -----------------------------
 # Training
 # -----------------------------
+def _build_scheduler(opt: torch.optim.Optimizer, cfg: LOBConfig, total_steps: int):
+    """Build an optional LR scheduler (warmup + cosine decay)."""
+    schedule = getattr(cfg, "lr_schedule", "constant").lower()
+    warmup = int(getattr(cfg, "lr_warmup_steps", 0))
+    if schedule == "constant" and warmup <= 0:
+        return None
+
+    def lr_lambda(step: int) -> float:
+        if step < warmup:
+            return float(step + 1) / float(max(1, warmup))
+        if schedule == "cosine":
+            progress = float(step - warmup) / float(max(1, total_steps - warmup))
+            return 0.5 * (1.0 + __import__("math").cos(__import__("math").pi * progress))
+        return 1.0
+
+    return torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
+
+
 def train_loop(
     ds: WindowedLOBParamsDataset,
     cfg: LOBConfig,
@@ -100,7 +123,13 @@ def train_loop(
         For BiFlowNFLOB only:
         - None / "nll"   : train forward flow NLL
         - "biflow"       : train reverse flow with biflow_loss (requires freeze_forward())
+
+    Features:
+    - EMA model averaging (cfg.ema_decay > 0)
+    - LR warmup + cosine decay (cfg.lr_schedule, cfg.lr_warmup_steps)
     """
+    from lob_baselines import EMAModel
+
     device = cfg.device
     loader = make_loader(ds, cfg.batch_size, shuffle=shuffle, drop_last=False)
     if len(loader) == 0:
@@ -124,6 +153,13 @@ def train_loop(
 
     opt = optimizer or torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
+    # LR scheduler
+    scheduler = _build_scheduler(opt, cfg, steps)
+
+    # EMA
+    ema_decay = float(getattr(cfg, "ema_decay", 0.0))
+    ema = EMAModel(model, decay=ema_decay) if ema_decay > 0 else None
+
     model.train()
     it = iter(loader)
     for step in range(1, steps + 1):
@@ -136,7 +172,7 @@ def train_loop(
         hist, tgt, fut, cond, _ = _parse_batch(batch)
         hist = hist.to(device).float()
         tgt = tgt.to(device).float()
-        fut = fut.to(device).float() if fut is not None else None   # <-- bugfix
+        fut = fut.to(device).float() if fut is not None else None
         cond = cond.to(device).float() if cond is not None else None
 
         opt.zero_grad(set_to_none=True)
@@ -165,8 +201,19 @@ def train_loop(
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
         opt.step()
 
+        if scheduler is not None:
+            scheduler.step()
+
+        if ema is not None:
+            ema.update(model)
+
         if step % log_every == 0:
-            print(f"[{model_name}] step {step}/{steps}  loss={logs.get('loss', float(loss)):.4f}  details={logs}")
+            lr_now = opt.param_groups[0]["lr"]
+            print(f"[{model_name}] step {step}/{steps}  loss={logs.get('loss', float(loss.detach())):.4f}  lr={lr_now:.2e}  details={logs}")
+
+    # Apply EMA weights for evaluation
+    if ema is not None:
+        ema.apply_shadow(model)
 
     return model.eval()
 
@@ -235,25 +282,11 @@ def generate_continuation(
 # ICASSP metrics (raw + params)
 # -----------------------------
 def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
-    out: Dict[str, float] = {}
-    for k, v in d.items():
-        kk = f"{prefix}.{k}" if prefix else str(k)
-        if isinstance(v, dict):
-            out.update(_flatten_dict(v, kk))
-        elif isinstance(v, (int, float, np.floating, np.integer, bool)):
-            out[kk] = float(v)
-    return out
+    return flatten_dict(d, prefix)
 
 
 def _unflatten_to_nested(flat_aggs: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
-    root: Dict[str, Any] = {}
-    for path, stats in flat_aggs.items():
-        cur = root
-        keys = path.split(".")
-        for k in keys[:-1]:
-            cur = cur.setdefault(k, {})
-        cur[keys[-1]] = stats
-    return root
+    return unflatten_to_nested(flat_aggs)
 
 
 def _safe_mean_std(vals):
@@ -303,21 +336,7 @@ def _acf(x: np.ndarray, max_lag: int = 20) -> np.ndarray:
 
 
 def _microstructure_series(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray) -> Dict[str, np.ndarray]:
-    eps = 1e-8
-    mid = 0.5 * (ask_p[:, 0] + bid_p[:, 0])
-    spread = ask_p[:, 0] - bid_p[:, 0]
-    depth = ask_v.sum(axis=1) + bid_v.sum(axis=1)
-    imb = (bid_v.sum(axis=1) - ask_v.sum(axis=1)) / (depth + eps)
-    ret = np.zeros_like(mid)
-    if len(mid) > 1:
-        ret[1:] = np.diff(mid)
-    return {
-        "mid": mid.astype(np.float32),
-        "spread": spread.astype(np.float32),
-        "depth": depth.astype(np.float32),
-        "imb": imb.astype(np.float32),
-        "ret": ret.astype(np.float32),
-    }
+    return microstructure_series(ask_p, ask_v, bid_p, bid_v)
 
 
 def _validity_metrics(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray) -> Dict[str, float]:
@@ -677,8 +696,8 @@ def benchmark_sampling_latency(
     if ds.cond is not None:
         cond_seq = torch.from_numpy(ds.cond[t0 : t0 + horizon]).to(cfg.device).float()[None]
 
-    for _ in range(max(0, warmup)):
-        _ = generate_continuation(model, hist, cond_seq, steps=horizon, nfe=nfe)
+    for __ in range(max(0, warmup)):
+        generate_continuation(model, hist, cond_seq, steps=horizon, nfe=nfe)
     _torch_sync(cfg.device)
 
     times = []

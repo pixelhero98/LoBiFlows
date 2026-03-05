@@ -407,18 +407,22 @@ def build_dataset_from_fi2010(path: str, cfg: LOBConfig, layout: str = "auto", s
     return _build_windowed_dataset(params_raw, mids, cfg, stride=stride)
 
 
-def build_dataset_synthetic(cfg: LOBConfig, length: int = 200_000, seed: int = 0, stride: int = 1) -> WindowedLOBParamsDataset:
+def _generate_synthetic_l2(
+    levels: int, length: int, seed: int, eps: float = 1e-8,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    """Generate synthetic L2 limit order book data.
+
+    Returns (ask_p, ask_v, bid_p, bid_v) each of shape [T, L].
+    """
     rng = np.random.default_rng(seed)
-    L = cfg.levels
+    L = levels
     T = int(length)
 
-    # simple synthetic: random walk mid, random spread/volumes with mild autocorr
     mid = np.cumsum(rng.normal(scale=0.01, size=T)).astype(np.float32) + 100.0
     spread = np.exp(rng.normal(loc=math.log(0.01), scale=0.05, size=T)).astype(np.float32)
     ask1 = mid + 0.5 * spread
     bid1 = mid - 0.5 * spread
 
-    # build level prices via constant gaps
     ask_p = np.zeros((T, L), dtype=np.float32)
     bid_p = np.zeros((T, L), dtype=np.float32)
     ask_p[:, 0] = ask1
@@ -427,13 +431,17 @@ def build_dataset_synthetic(cfg: LOBConfig, length: int = 200_000, seed: int = 0
         ask_p[:, i] = ask_p[:, i - 1] + spread * (0.5 + 0.1 * i)
         bid_p[:, i] = bid_p[:, i - 1] - spread * (0.5 + 0.1 * i)
 
-    # volumes lognormal with mild autocorr
     base = rng.normal(size=(T, L)).astype(np.float32)
     for t in range(1, T):
         base[t] = 0.95 * base[t - 1] + 0.05 * base[t]
     ask_v = np.exp(0.5 * base).astype(np.float32)
     bid_v = np.exp(0.5 * base[:, ::-1]).astype(np.float32)
 
+    return ask_p, ask_v, bid_p, bid_v
+
+
+def build_dataset_synthetic(cfg: LOBConfig, length: int = 200_000, seed: int = 0, stride: int = 1) -> WindowedLOBParamsDataset:
+    ask_p, ask_v, bid_p, bid_v = _generate_synthetic_l2(cfg.levels, length, seed, cfg.eps)
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)
     return _build_windowed_dataset(params_raw, mids, cfg, stride=stride)
@@ -773,29 +781,7 @@ def build_dataset_splits_synthetic(
     val_end: Optional[int] = None,
 ) -> Dict[str, object]:
     """Synthetic chronological split with train-only normalization."""
-    rng = np.random.default_rng(seed)
-    L = cfg.levels
-    T = int(length)
-
-    # same synthetic generator as build_dataset_synthetic()
-    mid = np.cumsum(rng.normal(scale=0.01, size=T)).astype(np.float32) + 100.0
-    spread = np.exp(rng.normal(loc=math.log(0.01), scale=0.05, size=T)).astype(np.float32)
-    ask1 = mid + 0.5 * spread
-    bid1 = mid - 0.5 * spread
-
-    ask_p = np.zeros((T, L), dtype=np.float32)
-    bid_p = np.zeros((T, L), dtype=np.float32)
-    ask_p[:, 0] = ask1
-    bid_p[:, 0] = bid1
-    for i in range(1, L):
-        ask_p[:, i] = ask_p[:, i - 1] + spread * (0.5 + 0.1 * i)
-        bid_p[:, i] = bid_p[:, i - 1] - spread * (0.5 + 0.1 * i)
-
-    base = rng.normal(size=(T, L)).astype(np.float32)
-    for t in range(1, T):
-        base[t] = 0.95 * base[t - 1] + 0.05 * base[t]
-    ask_v = np.exp(0.5 * base).astype(np.float32)
-    bid_v = np.exp(0.5 * base[:, ::-1]).astype(np.float32)
+    ask_p, ask_v, bid_p, bid_v = _generate_synthetic_l2(cfg.levels, length, seed, cfg.eps)
 
     fm = L2FeatureMap(cfg.levels, cfg.eps)
     params_raw, mids = fm.encode_sequence(ask_p, ask_v, bid_p, bid_v)

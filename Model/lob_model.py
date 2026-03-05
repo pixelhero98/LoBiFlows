@@ -8,6 +8,12 @@ LoBiFlow is a 1-NFE (and few-NFE) generator built on:
 - One-step sampling: x = z + u(z, t=0, ...)
 - Few-step sampling: Euler integrate dx/dt = u(x,t,...) for NFE steps
 
+Architecture improvements (v2):
+- FiLM-style conditioning: scale+shift modulation for t/cond instead of concatenation
+- Multi-scale context: average-pool + cross-attention for multi-resolution history view
+- ResMLP: residual MLP with skip connections for gradient health
+- Improved prior: proper KL divergence loss when conditional_prior=True
+
 This file intentionally contains ONLY our method.
 Baselines are in `lob_baselines.py`.
 """
@@ -24,6 +30,8 @@ import torch.nn.functional as F
 from lob_baselines import (
     LOBConfig,
     MLP,
+    build_mlp,
+    FiLMModulation,
     CondEmbedder,
     build_context_encoder,
     CrossAttentionConditioner,
@@ -33,36 +41,62 @@ from lob_baselines import (
 class LoBiFlow(nn.Module):
     """LoBiFlow: paired latent + mean/rectified-flow hybrid with LOB-aware conditioning.
 
-    Extras:
+    Features:
     - Context encoder selectable by cfg.ctx_encoder (LSTM/Transformer)
-    - Cross-attention over history tokens
+    - Cross-attention over history tokens + average-pooled context (multi-scale)
+    - FiLM-style conditioning modulation (cfg.film_conditioning)
+    - ResMLP with residual connections (cfg.use_res_mlp)
     - Optional classifier-free-style conditioning dropout via cfg.cfg_dropout
-    - Optional conditional Gaussian prior over z via cfg.conditional_prior
+    - Optional conditional Gaussian prior over z via cfg.conditional_prior + KL loss
     """
 
     def __init__(self, cfg: LOBConfig):
         super().__init__()
         self.cfg = cfg
         D = cfg.state_dim
+        H = cfg.hidden_dim
+        use_res = getattr(cfg, "use_res_mlp", True)
+        use_film = getattr(cfg, "film_conditioning", True)
 
         self.ctx_enc = build_context_encoder(cfg)
         self.cond_emb = CondEmbedder(cfg)
         self.cross = CrossAttentionConditioner(cfg)
 
-        self.x_proj = nn.Linear(D, cfg.hidden_dim)
+        self.x_proj = nn.Linear(D, H)
 
-        # f_psi: (x, ctx_attn, cond_emb) -> z_hat
-        f_in = D + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-        self.f_net = MLP(f_in, cfg.hidden_dim, D, dropout=cfg.dropout)
+        # Multi-scale context: merge cross-attention output with avg-pooled context
+        self.ctx_pool_proj = nn.Linear(H, H)
+        self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
 
-        # u_theta: (x_t, ctx_attn, t_emb, cond_emb) -> u
-        u_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-        self.u_net = MLP(u_in, cfg.hidden_dim, D, dropout=cfg.dropout)
+        # FiLM conditioning modules
+        self.use_film = use_film
+        if use_film:
+            # FiLM modulation layers for t and cond
+            self.film_t = FiLMModulation(H, H)
+            if cfg.cond_dim > 0:
+                self.film_cond = FiLMModulation(H, H)
+            else:
+                self.film_cond = None
+
+            # f_psi: (x, ctx_multiscale) -> z_hat  [FiLM-conditioned]
+            f_in = D + H
+            self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
+
+            # u_theta: (x_t, ctx_multiscale) -> u  [FiLM-conditioned by t and cond]
+            u_in = D + H
+            self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
+        else:
+            # Legacy concatenation-based approach
+            f_in = D + H + (H if cfg.cond_dim > 0 else 0)
+            self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
+
+            u_in = D + H + H + (H if cfg.cond_dim > 0 else 0)
+            self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
 
         # Optional conditional prior p(z|hist,cond): outputs (mu, log_sigma)
         if getattr(cfg, "conditional_prior", False):
-            prior_in = cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
-            self.prior_net = MLP(prior_in, cfg.hidden_dim, 2 * D, dropout=cfg.dropout)
+            prior_in = H + (H if cfg.cond_dim > 0 else 0)
+            self.prior_net = build_mlp(prior_in, H, 2 * D, dropout=cfg.dropout, use_res=use_res)
         else:
             self.prior_net = None
 
@@ -120,30 +154,57 @@ class LoBiFlow(nn.Module):
         eps = torch.randn_like(mu)
         return mu + torch.exp(log_sig) * eps
 
+    def _multiscale_ctx(self, ctx_tokens: torch.Tensor, cross_out: torch.Tensor) -> torch.Tensor:
+        """Merge cross-attention output with average-pooled context for multi-scale view."""
+        avg_pool = self.ctx_pool_proj(ctx_tokens.mean(dim=1))  # [B, H]
+        return self.ctx_merge(torch.cat([cross_out, avg_pool], dim=-1))  # [B, H]
+
     def _prep(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]):
-        """Prepare cross-attended context summary and embeddings."""
+        """Prepare multi-scale context summary and embeddings."""
         ctx_tokens, _pooled = self.ctx_enc(hist)  # [B,T,H]
         t_e = self.cond_emb.embed_t(t)
         c_e = self.cond_emb.embed_cond(cond)
         c_e = self._maybe_drop_cond(c_e)
         q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
-        ctx = self.cross(q, ctx_tokens)
+        cross_out = self.cross(q, ctx_tokens)
+        ctx = self._multiscale_ctx(ctx_tokens, cross_out)
         return ctx, t_e, c_e
 
     def f_forward(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         t0 = torch.zeros(x.shape[0], 1, device=x.device)
         ctx, _t_e, c_e = self._prep(hist, x, t0, cond)
-        parts = [x, ctx]
-        if c_e is not None:
-            parts.append(c_e)
-        return self.f_net(torch.cat(parts, dim=-1))
+
+        if self.use_film:
+            # FiLM: modulate context with cond embedding, then feed (x, ctx) to f_net
+            if self.film_cond is not None and c_e is not None:
+                ctx = self.film_cond(ctx, c_e)
+            return self.f_net(torch.cat([x, ctx], dim=-1))
+        else:
+            # Legacy: concatenate everything
+            parts = [x, ctx]
+            if c_e is not None:
+                parts.append(c_e)
+            return self.f_net(torch.cat(parts, dim=-1))
 
     def u_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         ctx, t_e, c_e = self._prep(hist, x_t, t, cond)
-        parts = [x_t, ctx, t_e]
-        if c_e is not None:
-            parts.append(c_e)
-        return self.u_net(torch.cat(parts, dim=-1))
+
+        if self.use_film:
+            # FiLM: modulate context with t_e and cond_e
+            ctx = self.film_t(ctx, t_e)
+            if self.film_cond is not None and c_e is not None:
+                ctx = self.film_cond(ctx, c_e)
+            return self.u_net(torch.cat([x_t, ctx], dim=-1))
+        else:
+            # Legacy: concatenate everything
+            parts = [x_t, ctx, t_e]
+            if c_e is not None:
+                parts.append(c_e)
+            return self.u_net(torch.cat(parts, dim=-1))
+
+    def _kl_divergence(self, mu: torch.Tensor, log_sig: torch.Tensor) -> torch.Tensor:
+        """KL(q(z|x) || p(z)) where q is N(mu, sigma^2) and p is N(0,I)."""
+        return -0.5 * torch.mean(1 + 2 * log_sig - mu**2 - torch.exp(2 * log_sig))
 
     def loss(
         self,
@@ -155,7 +216,7 @@ class LoBiFlow(nn.Module):
         """Core LoBiFlow objective.
 
         Terms:
-        - prior moment match on z_hat
+        - prior moment match on z_hat (and optional KL divergence)
         - mean / rectified flow matching
         - one-step reconstruction at t=0
         - z-cycle consistency
@@ -167,6 +228,12 @@ class LoBiFlow(nn.Module):
         mu = z_hat.mean(dim=0)
         var = z_hat.var(dim=0, unbiased=False)
         prior = (mu**2).mean() + (var - 1.0).abs().mean()
+
+        # Optional KL divergence for conditional prior
+        kl_loss = torch.tensor(0.0, device=x.device)
+        if self.prior_net is not None:
+            p_mu, p_log_sig = self._prior_params(hist, cond)
+            kl_loss = self._kl_divergence(p_mu, p_log_sig)
 
         # Mean / rectified flow loss
         t = torch.rand(B, 1, device=x.device)
@@ -192,13 +259,15 @@ class LoBiFlow(nn.Module):
         w_mean = float(getattr(self.cfg, "lambda_mean", 1.0))
         w_xrec = float(getattr(self.cfg, "lambda_xrec", 1.0))
         w_zcyc = float(getattr(self.cfg, "lambda_zcycle", 0.1))
+        w_kl = float(getattr(self.cfg, "lambda_kl", 0.01))
 
-        loss = w_prior * prior + w_mean * mean + w_xrec * xrec + w_zcyc * zcycle
+        loss = w_prior * prior + w_mean * mean + w_xrec * xrec + w_zcyc * zcycle + w_kl * kl_loss
         logs = {
             "prior": float(prior.detach().cpu()),
             "mean": float(mean.detach().cpu()),
             "xrec": float(xrec.detach().cpu()),
             "zcycle": float(zcycle.detach().cpu()),
+            "kl": float(kl_loss.detach().cpu()),
             "loss": float(loss.detach().cpu()),
         }
         return loss, logs

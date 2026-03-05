@@ -96,6 +96,16 @@ class LOBConfig:
     flow_scale_clip: float = 2.0
     share_coupling_backbone: bool = True
 
+    # -----------------------------
+    # Architecture upgrades (Phase 3)
+    # -----------------------------
+    use_res_mlp: bool = True         # Use ResMLP (residual skip connections) instead of flat MLP
+    film_conditioning: bool = True   # Use FiLM (scale+shift) instead of concatenation for t/cond
+    ema_decay: float = 0.999         # EMA decay for evaluation model (0 = disabled)
+    lr_warmup_steps: int = 500       # LR warmup steps
+    lr_schedule: str = "cosine"      # "cosine" | "constant" LR scheduler
+    lambda_kl: float = 0.01          # KL weight for conditional prior
+
     # Derived: state dim (params per snapshot)
     @property
     def state_dim(self) -> int:
@@ -120,6 +130,112 @@ class MLP(nn.Module):
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
         return self.net(x)
+
+
+class ResBlock(nn.Module):
+    """Pre-norm residual block with SiLU activation."""
+    def __init__(self, dim: int, dropout: float = 0.0):
+        super().__init__()
+        self.norm = nn.LayerNorm(dim)
+        self.fc1 = nn.Linear(dim, dim)
+        self.fc2 = nn.Linear(dim, dim)
+        self.drop = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = self.norm(x)
+        h = F.silu(self.fc1(h))
+        h = self.drop(h)
+        h = self.fc2(h)
+        return x + h
+
+
+class ResMLP(nn.Module):
+    """MLP with residual skip connections and LayerNorm.
+
+    in -> projection -> [ResBlock x n_blocks] -> out_projection -> LayerNorm -> out
+    """
+    def __init__(self, in_dim: int, hidden_dim: int, out_dim: int, n_blocks: int = 2, dropout: float = 0.0):
+        super().__init__()
+        self.in_proj = nn.Linear(in_dim, hidden_dim)
+        self.blocks = nn.ModuleList([ResBlock(hidden_dim, dropout) for _ in range(n_blocks)])
+        self.out_proj = nn.Linear(hidden_dim, out_dim)
+        self.out_norm = nn.LayerNorm(out_dim)
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        h = F.silu(self.in_proj(x))
+        for blk in self.blocks:
+            h = blk(h)
+        return self.out_norm(self.out_proj(h))
+
+
+def build_mlp(in_dim: int, hidden_dim: int, out_dim: int, dropout: float = 0.0, use_res: bool = True) -> nn.Module:
+    """Factory: choose between flat MLP and ResMLP."""
+    if use_res:
+        return ResMLP(in_dim, hidden_dim, out_dim, n_blocks=2, dropout=dropout)
+    return MLP(in_dim, hidden_dim, out_dim, dropout=dropout)
+
+
+class FiLMModulation(nn.Module):
+    """Feature-wise Linear Modulation: project conditioning to (scale, shift)
+    and modulate target features as:  out = scale * x + shift.
+
+    This is superior to concatenation because it directly modulates activations
+    rather than forcing the network to learn to extract conditioning from a
+    longer concatenated input.
+    """
+    def __init__(self, cond_dim: int, target_dim: int):
+        super().__init__()
+        self.proj = nn.Linear(cond_dim, 2 * target_dim)
+        nn.init.zeros_(self.proj.weight)
+        nn.init.zeros_(self.proj.bias)
+        # Initialize so that scale = 1, shift = 0 at start (identity modulation)
+        with torch.no_grad():
+            self.proj.bias[:target_dim] = 1.0
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        params = self.proj(cond)
+        scale, shift = params.chunk(2, dim=-1)
+        return scale * x + shift
+
+
+class EMAModel:
+    """Exponential Moving Average of model parameters for stable evaluation.
+
+    Usage:
+        ema = EMAModel(model, decay=0.999)
+        # In training loop:
+        ema.update(model)
+        # For evaluation:
+        ema.apply_shadow(model)  # swap weights
+        ... evaluate ...
+        ema.restore(model)       # swap back
+    """
+    def __init__(self, model: nn.Module, decay: float = 0.999):
+        self.decay = decay
+        self.shadow: Dict[str, torch.Tensor] = {}
+        self.backup: Dict[str, torch.Tensor] = {}
+        for name, param in model.named_parameters():
+            if param.requires_grad:
+                self.shadow[name] = param.data.clone()
+
+    @torch.no_grad()
+    def update(self, model: nn.Module):
+        for name, param in model.named_parameters():
+            if name in self.shadow:
+                self.shadow[name].mul_(self.decay).add_(param.data, alpha=1 - self.decay)
+
+    def apply_shadow(self, model: nn.Module):
+        self.backup = {}
+        for name, param in model.named_parameters():
+            if name in self.shadow:
+                self.backup[name] = param.data.clone()
+                param.data.copy_(self.shadow[name])
+
+    def restore(self, model: nn.Module):
+        for name, param in model.named_parameters():
+            if name in self.backup:
+                param.data.copy_(self.backup[name])
+        self.backup = {}
 
 
 # -----------------------------
@@ -259,17 +375,16 @@ class BiFlowLOB(nn.Module):
         v_in = D + cfg.hidden_dim + cfg.hidden_dim + (cfg.hidden_dim if cfg.cond_dim > 0 else 0)
         self.v_net = MLP(v_in, cfg.hidden_dim, D, dropout=cfg.dropout)
 
-    def _ctx(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, Optional[torch.Tensor]]:
+    def _ctx(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]) -> Tuple[torch.Tensor, torch.Tensor, Optional[torch.Tensor]]:
         ctx_tokens, _ = self.ctx_enc(hist)
         t_e = self.cond_emb.embed_t(t)
         c_e = self.cond_emb.embed_cond(cond)
         q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
         ctx = self.cross(q, ctx_tokens)
-        return ctx, c_e
+        return ctx, t_e, c_e
 
     def v_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        ctx, c_e = self._ctx(hist, x_t, t, cond)
-        t_e = self.cond_emb.embed_t(t)
+        ctx, t_e, c_e = self._ctx(hist, x_t, t, cond)
         pieces = [x_t, ctx, t_e]
         if c_e is not None:
             pieces.append(c_e)
@@ -503,6 +618,14 @@ class BiFlowNFLOB(nn.Module):
 __all__ = [
     "LOBConfig",
     "MLP",
+    "ResMLP",
+    "ResBlock",
+    "build_mlp",
+    "FiLMModulation",
+    "EMAModel",
+    "CondEmbedder",
+    "build_context_encoder",
+    "CrossAttentionConditioner",
     "BiFlowLOB",
     "BiFlowNFLOB",
 ]

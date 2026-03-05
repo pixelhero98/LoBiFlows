@@ -74,15 +74,7 @@ def _parse_str_list(s: str) -> List[str]:
     return [x.strip() for x in s.split(",") if x.strip()]
 
 
-def _flatten(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
-    out: Dict[str, float] = {}
-    for k, v in d.items():
-        kk = f"{prefix}.{k}" if prefix else str(k)
-        if isinstance(v, dict):
-            out.update(_flatten(v, kk))
-        elif isinstance(v, (int, float, np.integer, np.floating, bool)):
-            out[kk] = float(v)
-    return out
+from lob_utils import flatten_dict as _flatten
 
 
 def _safe_cfg_set(cfg: LOBConfig, key: str, val: Any):
