@@ -223,8 +223,4 @@ class LoBiFlow(nn.Module):
             x = x + dt * u
         return x
 
-
-# Backward-compatible alias
-BiMeanFlowLOB = LoBiFlow
-
-__all__ = ["LoBiFlow", "BiMeanFlowLOB"]
+__all__ = ["LoBiFlow"]
