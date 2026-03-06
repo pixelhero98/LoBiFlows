@@ -106,6 +106,13 @@ class LOBConfig:
     lr_schedule: str = "cosine"      # "cosine" | "constant" LR scheduler
     lambda_kl: float = 0.01          # KL weight for conditional prior
 
+    # -----------------------------
+    # Transformer f/u-net (Phase 4)
+    # -----------------------------
+    fu_net_type: str = "mlp"         # "mlp" | "transformer" — backbone for f_net/u_net
+    fu_net_layers: int = 3           # number of TransformerFUBlocks in f/u-net
+    fu_net_heads: int = 4            # attention heads in f/u-net Transformer
+
     # Derived: state dim (params per snapshot)
     @property
     def state_dim(self) -> int:
@@ -173,6 +180,140 @@ def build_mlp(in_dim: int, hidden_dim: int, out_dim: int, dropout: float = 0.0, 
     if use_res:
         return ResMLP(in_dim, hidden_dim, out_dim, n_blocks=2, dropout=dropout)
     return MLP(in_dim, hidden_dim, out_dim, dropout=dropout)
+
+
+# ---------------------------------------------------------
+# Transformer-based f/u-net building blocks (Phase 4)
+# ---------------------------------------------------------
+class AdaLN(nn.Module):
+    """Adaptive Layer Normalization (DiT-style).
+
+    Modulates LayerNorm output with learned scale (γ) and shift (β)
+    derived from a conditioning vector:  out = γ * LayerNorm(x) + β.
+    Initialized to identity (γ=1, β=0).
+    """
+    def __init__(self, hidden_dim: int, cond_dim: int):
+        super().__init__()
+        self.norm = nn.LayerNorm(hidden_dim, elementwise_affine=False)
+        self.proj = nn.Linear(cond_dim, 2 * hidden_dim)
+        # Identity init: scale=1, shift=0
+        nn.init.zeros_(self.proj.weight)
+        nn.init.zeros_(self.proj.bias)
+        with torch.no_grad():
+            self.proj.bias[:hidden_dim] = 1.0
+
+    def forward(self, x: torch.Tensor, cond: torch.Tensor) -> torch.Tensor:
+        """x: [B, N, H] or [B, H];  cond: [B, H]."""
+        params = self.proj(cond)
+        if x.dim() == 3 and params.dim() == 2:
+            params = params[:, None, :]  # broadcast over token dim
+        scale, shift = params.chunk(2, dim=-1)
+        return scale * self.norm(x) + shift
+
+
+class TransformerFUBlock(nn.Module):
+    """Single Transformer block for f/u-net with AdaLN conditioning.
+
+    Sub-layers (all with residual connections):
+        1. AdaLN → Multi-Head Self-Attention across LOB level tokens
+        2. AdaLN → Multi-Head Cross-Attention (query=levels, kv=history ctx_tokens)
+        3. AdaLN → Feed-Forward Network (SiLU MLP)
+    """
+    def __init__(self, hidden_dim: int, n_heads: int, dropout: float = 0.0):
+        super().__init__()
+        # Self-attention
+        self.adaln_sa = AdaLN(hidden_dim, hidden_dim)
+        self.self_attn = nn.MultiheadAttention(
+            hidden_dim, num_heads=n_heads, batch_first=True, dropout=dropout,
+        )
+        # Cross-attention to history
+        self.adaln_ca = AdaLN(hidden_dim, hidden_dim)
+        self.cross_attn = nn.MultiheadAttention(
+            hidden_dim, num_heads=n_heads, batch_first=True, dropout=dropout,
+        )
+        # FFN
+        self.adaln_ff = AdaLN(hidden_dim, hidden_dim)
+        self.ffn = nn.Sequential(
+            nn.Linear(hidden_dim, 4 * hidden_dim),
+            nn.SiLU(),
+            nn.Dropout(dropout),
+            nn.Linear(4 * hidden_dim, hidden_dim),
+            nn.Dropout(dropout),
+        )
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        ctx_tokens: torch.Tensor,
+        adaln_cond: torch.Tensor,
+    ) -> torch.Tensor:
+        """x: [B, N, H] level tokens;  ctx_tokens: [B, T, H];  adaln_cond: [B, H]."""
+        # Self-attention
+        h = self.adaln_sa(x, adaln_cond)
+        h, _ = self.self_attn(h, h, h, need_weights=False)
+        x = x + h
+        # Cross-attention to history
+        h = self.adaln_ca(x, adaln_cond)
+        h, _ = self.cross_attn(h, ctx_tokens, ctx_tokens, need_weights=False)
+        x = x + h
+        # FFN
+        h = self.adaln_ff(x, adaln_cond)
+        x = x + self.ffn(h)
+        return x
+
+
+class TransformerFUNet(nn.Module):
+    """Transformer-based f/u-net backbone (replaces ResMLP).
+
+    Tokenizes the LOB state into per-level tokens, processes with
+    AdaLN-conditioned Transformer blocks (self-attn + cross-attn to
+    history + FFN), then reads out the predicted state vector.
+
+    Inputs:
+        x         : [B, state_dim]   — LOB state (4 * levels)
+        ctx_tokens: [B, T, H]        — history context token sequence
+        adaln_cond: [B, H]           — conditioning vector (t_emb + cond_emb)
+    Output:
+        out       : [B, state_dim]
+    """
+    def __init__(self, cfg: 'LOBConfig'):
+        super().__init__()
+        H = cfg.hidden_dim
+        self.levels = cfg.levels
+        self.token_dim = 4  # (bid_p, bid_v, ask_p, ask_v) per level
+
+        # Input: project each 4-d level token to H
+        self.in_proj = nn.Linear(self.token_dim, H)
+        self.level_pos = nn.Parameter(torch.zeros(1, cfg.levels, H))
+
+        # Transformer blocks
+        self.blocks = nn.ModuleList([
+            TransformerFUBlock(H, cfg.fu_net_heads, dropout=cfg.dropout)
+            for _ in range(cfg.fu_net_layers)
+        ])
+
+        # Output: AdaLN + project back to 4 per level
+        self.out_adaln = AdaLN(H, H)
+        self.out_proj = nn.Linear(H, self.token_dim)
+
+    def forward(
+        self,
+        x: torch.Tensor,
+        ctx_tokens: torch.Tensor,
+        adaln_cond: torch.Tensor,
+    ) -> torch.Tensor:
+        B = x.shape[0]
+        # Tokenize: (B, 4*levels) -> (B, levels, 4)
+        tokens = x.view(B, self.levels, self.token_dim)
+        h = self.in_proj(tokens) + self.level_pos
+
+        for blk in self.blocks:
+            h = blk(h, ctx_tokens, adaln_cond)
+
+        # Readout: (B, levels, H) -> (B, levels, 4) -> (B, 4*levels)
+        h = self.out_adaln(h, adaln_cond)
+        out = self.out_proj(h)
+        return out.reshape(B, -1)
 
 
 class FiLMModulation(nn.Module):
@@ -621,6 +762,9 @@ __all__ = [
     "ResMLP",
     "ResBlock",
     "build_mlp",
+    "AdaLN",
+    "TransformerFUBlock",
+    "TransformerFUNet",
     "FiLMModulation",
     "EMAModel",
     "CondEmbedder",

@@ -201,6 +201,39 @@ def test_biflow_nf_forward():
     out = model.sample(hist, cond=cond)
     assert out.shape == (B, D)
 
+def test_transformer_fu_net():
+    """Test standalone TransformerFUNet construction and forward pass."""
+    from lob_baselines import LOBConfig, TransformerFUNet
+    cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
+                     fu_net_type="transformer", fu_net_layers=2, fu_net_heads=4)
+    net = TransformerFUNet(cfg)
+    B, D, H, T = 4, cfg.state_dim, cfg.hidden_dim, 20
+    x = torch.randn(B, D)
+    ctx_tokens = torch.randn(B, T, H)
+    adaln_cond = torch.randn(B, H)
+    out = net(x, ctx_tokens, adaln_cond)
+    assert out.shape == (B, D), f"TransformerFUNet output shape mismatch: {out.shape}"
+
+def test_lobiflow_transformer_forward():
+    """Test LoBiFlow with fu_net_type='transformer' — loss + sampling."""
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+    cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
+                     fu_net_type="transformer", fu_net_layers=2, fu_net_heads=4)
+    model = LoBiFlow(cfg)
+    B, H, D = 4, 20, cfg.state_dim
+    hist = torch.randn(B, H, D)
+    tgt = torch.randn(B, D)
+    cond = torch.randn(B, 7)
+    loss, logs = model.loss(tgt, hist, cond=cond)
+    assert loss.shape == (), f"Loss should be scalar, got {loss.shape}"
+    assert "prior" in logs and "mean" in logs and "xrec" in logs and "zcycle" in logs
+    # Sampling
+    out = model.sample(hist, cond=cond, steps=1)
+    assert out.shape == (B, D), f"Sample shape mismatch: got {out.shape}"
+    out2 = model.sample(hist, cond=cond, steps=3)
+    assert out2.shape == (B, D), f"Multi-step sample shape mismatch: got {out2.shape}"
+
 def test_train_loop_short():
     from lob_baselines import LOBConfig
     from lob_datasets import build_dataset_splits_synthetic
@@ -265,6 +298,8 @@ def main():
         ("lobiflow_legacy_mode", test_lobiflow_legacy_mode),
         ("biflow_forward", test_biflow_forward),
         ("biflow_nf_forward", test_biflow_nf_forward),
+        ("transformer_fu_net", test_transformer_fu_net),
+        ("lobiflow_transformer_forward", test_lobiflow_transformer_forward),
         ("train_loop_short", test_train_loop_short),
         ("eval_pipeline", test_eval_pipeline),
         ("utils", test_utils),
@@ -278,3 +313,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+

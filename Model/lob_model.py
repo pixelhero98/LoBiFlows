@@ -8,6 +8,18 @@ LoBiFlow is a 1-NFE (and few-NFE) generator built on:
 - One-step sampling: x = z + u(z, t=0, ...)
 - Few-step sampling: Euler integrate dx/dt = u(x,t,...) for NFE steps
 
+Architecture improvements (v2):
+- FiLM-style conditioning: scale+shift modulation for t/cond instead of concatenation
+- Multi-scale context: average-pool + cross-attention for multi-resolution history view
+- ResMLP: residual MLP with skip connections for gradient health
+- Improved prior: proper KL divergence loss when conditional_prior=True
+
+Architecture improvements (v3 — Transformer f/u-net):
+- AdaLN Transformer backbone for f_net/u_net (cfg.fu_net_type="transformer")
+- Per-level tokenization: LOB state → (levels, 4) tokens with self-attention
+- Cross-attention to full history context tokens (richer than collapsed vector)
+- AdaLN conditioning from time + cond embeddings (replaces FiLM for this path)
+
 This file intentionally contains ONLY our method.
 Baselines are in `lob_baselines.py`.
 """
@@ -29,6 +41,7 @@ from lob_baselines import (
     CondEmbedder,
     build_context_encoder,
     CrossAttentionConditioner,
+    TransformerFUNet,
 )
 
 
@@ -40,6 +53,7 @@ class LoBiFlow(nn.Module):
     - Cross-attention over history tokens + average-pooled context (multi-scale)
     - FiLM-style conditioning modulation (cfg.film_conditioning)
     - ResMLP with residual connections (cfg.use_res_mlp)
+    - AdaLN Transformer f/u-net with per-level tokenization (cfg.fu_net_type="transformer")
     - Optional classifier-free-style conditioning dropout via cfg.cfg_dropout
     - Optional conditional Gaussian prior over z via cfg.conditional_prior + KL loss
     """
@@ -51,6 +65,7 @@ class LoBiFlow(nn.Module):
         H = cfg.hidden_dim
         use_res = getattr(cfg, "use_res_mlp", True)
         use_film = getattr(cfg, "film_conditioning", True)
+        self.use_transformer = getattr(cfg, "fu_net_type", "mlp").lower() == "transformer"
 
         self.ctx_enc = build_context_encoder(cfg)
         self.cond_emb = CondEmbedder(cfg)
@@ -58,34 +73,38 @@ class LoBiFlow(nn.Module):
 
         self.x_proj = nn.Linear(D, H)
 
-        # Multi-scale context: merge cross-attention output with avg-pooled context
-        self.ctx_pool_proj = nn.Linear(H, H)
-        self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
-
-        # FiLM conditioning modules
-        self.use_film = use_film
-        if use_film:
-            # FiLM modulation layers for t and cond
-            self.film_t = FiLMModulation(H, H)
-            if cfg.cond_dim > 0:
-                self.film_cond = FiLMModulation(H, H)
-            else:
-                self.film_cond = None
-
-            # f_psi: (x, ctx_multiscale) -> z_hat  [FiLM-conditioned]
-            f_in = D + H
-            self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
-
-            # u_theta: (x_t, ctx_multiscale) -> u  [FiLM-conditioned by t and cond]
-            u_in = D + H
-            self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
+        if self.use_transformer:
+            # -- Transformer f/u-net path --
+            # AdaLN + cross-attention handle conditioning internally;
+            # no need for multi-scale merge or FiLM layers.
+            self.use_film = False  # not used on this path
+            self.f_net = TransformerFUNet(cfg)
+            self.u_net = TransformerFUNet(cfg)
         else:
-            # Legacy concatenation-based approach
-            f_in = D + H + (H if cfg.cond_dim > 0 else 0)
-            self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
+            # -- MLP path (original) --
+            # Multi-scale context: merge cross-attention output with avg-pooled context
+            self.ctx_pool_proj = nn.Linear(H, H)
+            self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
 
-            u_in = D + H + H + (H if cfg.cond_dim > 0 else 0)
-            self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
+            # FiLM conditioning modules
+            self.use_film = use_film
+            if use_film:
+                self.film_t = FiLMModulation(H, H)
+                if cfg.cond_dim > 0:
+                    self.film_cond = FiLMModulation(H, H)
+                else:
+                    self.film_cond = None
+
+                f_in = D + H
+                self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
+                u_in = D + H
+                self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
+            else:
+                # Legacy concatenation-based approach
+                f_in = D + H + (H if cfg.cond_dim > 0 else 0)
+                self.f_net = build_mlp(f_in, H, D, dropout=cfg.dropout, use_res=use_res)
+                u_in = D + H + H + (H if cfg.cond_dim > 0 else 0)
+                self.u_net = build_mlp(u_in, H, D, dropout=cfg.dropout, use_res=use_res)
 
         # Optional conditional prior p(z|hist,cond): outputs (mu, log_sigma)
         if getattr(cfg, "conditional_prior", False):
@@ -154,43 +173,63 @@ class LoBiFlow(nn.Module):
         return self.ctx_merge(torch.cat([cross_out, avg_pool], dim=-1))  # [B, H]
 
     def _prep(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]):
-        """Prepare multi-scale context summary and embeddings."""
+        """Prepare context and embeddings.
+
+        Returns:
+            ctx_tokens : [B, T, H]  — raw encoder output tokens (for Transformer cross-attn)
+            ctx        : [B, H]     — multi-scale merged context (for MLP path)
+            t_e        : [B, H]
+            c_e        : [B, H] or None
+        """
         ctx_tokens, _pooled = self.ctx_enc(hist)  # [B,T,H]
         t_e = self.cond_emb.embed_t(t)
         c_e = self.cond_emb.embed_cond(cond)
         c_e = self._maybe_drop_cond(c_e)
         q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
         cross_out = self.cross(q, ctx_tokens)
-        ctx = self._multiscale_ctx(ctx_tokens, cross_out)
-        return ctx, t_e, c_e
+
+        if self.use_transformer:
+            # Transformer path doesn't need the merged ctx — it cross-attends directly
+            return ctx_tokens, None, t_e, c_e
+        else:
+            ctx = self._multiscale_ctx(ctx_tokens, cross_out)
+            return ctx_tokens, ctx, t_e, c_e
+
+    def _adaln_cond(self, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> torch.Tensor:
+        """Combine time and conditioning embeddings into a single AdaLN conditioning vector."""
+        if c_e is not None:
+            return t_e + c_e
+        return t_e
 
     def f_forward(self, x: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
         t0 = torch.zeros(x.shape[0], 1, device=x.device)
-        ctx, _t_e, c_e = self._prep(hist, x, t0, cond)
+        ctx_tokens, ctx, t_e, c_e = self._prep(hist, x, t0, cond)
+
+        if self.use_transformer:
+            return self.f_net(x, ctx_tokens, self._adaln_cond(t_e, c_e))
 
         if self.use_film:
-            # FiLM: modulate context with cond embedding, then feed (x, ctx) to f_net
             if self.film_cond is not None and c_e is not None:
                 ctx = self.film_cond(ctx, c_e)
             return self.f_net(torch.cat([x, ctx], dim=-1))
         else:
-            # Legacy: concatenate everything
             parts = [x, ctx]
             if c_e is not None:
                 parts.append(c_e)
             return self.f_net(torch.cat(parts, dim=-1))
 
     def u_forward(self, x_t: torch.Tensor, t: torch.Tensor, hist: torch.Tensor, cond: Optional[torch.Tensor] = None) -> torch.Tensor:
-        ctx, t_e, c_e = self._prep(hist, x_t, t, cond)
+        ctx_tokens, ctx, t_e, c_e = self._prep(hist, x_t, t, cond)
+
+        if self.use_transformer:
+            return self.u_net(x_t, ctx_tokens, self._adaln_cond(t_e, c_e))
 
         if self.use_film:
-            # FiLM: modulate context with t_e and cond_e
             ctx = self.film_t(ctx, t_e)
             if self.film_cond is not None and c_e is not None:
                 ctx = self.film_cond(ctx, c_e)
             return self.u_net(torch.cat([x_t, ctx], dim=-1))
         else:
-            # Legacy: concatenate everything
             parts = [x_t, ctx, t_e]
             if c_e is not None:
                 parts.append(c_e)
