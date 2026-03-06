@@ -28,6 +28,8 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
+import random
+
 import numpy as np
 import torch
 import torch.nn as nn
@@ -239,6 +241,53 @@ class LoBiFlow(nn.Module):
         """KL(q(z|x) || p(z)) where q is N(mu, sigma^2) and p is N(0,I)."""
         return -0.5 * torch.mean(1 + 2 * log_sig - mu**2 - torch.exp(2 * log_sig))
 
+    def _imbalance_loss(self, x: torch.Tensor) -> torch.Tensor:
+        """Soft penalties for LOB structural violations.
+
+        Penalizes:
+        - Negative bid-ask spread (crossed market)
+        - Non-monotonic bid prices (should decrease with level)
+        - Non-monotonic ask prices (should increase with level)
+        - Negative volumes
+        """
+        L = self.cfg.levels
+        eps = self.cfg.eps
+        # x: [B, 4*L] laid out as [bid_p, bid_v, ask_p, ask_v] each of length L
+        bid_p = x[:, 0:L]
+        bid_v = x[:, L:2*L]
+        ask_p = x[:, 2*L:3*L]
+        ask_v = x[:, 3*L:4*L]
+
+        # Spread: ask_p should > bid_p at each level
+        spread_viol = F.relu(bid_p - ask_p + eps)
+        # Bid monotonicity: bid_p[i] >= bid_p[i+1] (prices decrease away from mid)
+        bid_mono = F.relu(bid_p[:, 1:] - bid_p[:, :-1] + eps)
+        # Ask monotonicity: ask_p[i] <= ask_p[i+1] (prices increase away from mid)
+        ask_mono = F.relu(ask_p[:, :-1] - ask_p[:, 1:] + eps)
+        # Volume positivity
+        vol_viol = F.relu(-bid_v) + F.relu(-ask_v)
+
+        return spread_viol.mean() + bid_mono.mean() + ask_mono.mean() + vol_viol.mean()
+
+    def _rollout_loss(self, z_hat: torch.Tensor, x: torch.Tensor,
+                      hist: torch.Tensor, cond: Optional[torch.Tensor]) -> torch.Tensor:
+        """Multi-step Euler rollout loss.
+
+        Simulates K Euler steps from z_hat to x_rollout and penalizes
+        deviation from ground truth x.  z_hat is detached to avoid
+        destabilizing f_net with long rollout gradient chains.
+        """
+        lo, hi = self.cfg.rollout_steps_range
+        K = random.randint(lo, hi)
+        dt = 1.0 / float(K)
+        B = x.shape[0]
+        x_k = z_hat.detach()
+        for k in range(K):
+            t_k = torch.full((B, 1), k * dt, device=x.device)
+            u_k = self.u_forward(x_k, t_k, hist, cond=cond)
+            x_k = x_k + dt * u_k
+        return F.mse_loss(x_k, x)
+
     def loss(
         self,
         x: torch.Tensor,
@@ -288,19 +337,35 @@ class LoBiFlow(nn.Module):
         z_rec = self.f_forward(x_fake, hist, cond=cond)
         zcycle = F.mse_loss(z_rec, z0)
 
+        # Rollout loss (multi-step Euler consistency)
+        w_rollout = float(getattr(self.cfg, "lambda_rollout", 0.0))
+        rollout_loss = torch.tensor(0.0, device=x.device)
+        if w_rollout > 0.0:
+            rollout_loss = self._rollout_loss(z_hat, x, hist, cond)
+
+        # Imbalance loss (LOB microstructure constraint)
+        w_imb = float(getattr(self.cfg, "lambda_imbalance", 0.0))
+        imbalance_loss = torch.tensor(0.0, device=x.device)
+        if w_imb > 0.0:
+            imbalance_loss = 0.5 * (self._imbalance_loss(x_rec) + self._imbalance_loss(x_fake))
+
         w_prior = float(getattr(self.cfg, "lambda_prior", 1.0))
         w_mean = float(getattr(self.cfg, "lambda_mean", 1.0))
         w_xrec = float(getattr(self.cfg, "lambda_xrec", 1.0))
         w_zcyc = float(getattr(self.cfg, "lambda_zcycle", 0.1))
         w_kl = float(getattr(self.cfg, "lambda_kl", 0.01))
 
-        loss = w_prior * prior + w_mean * mean + w_xrec * xrec + w_zcyc * zcycle + w_kl * kl_loss
+        loss = (w_prior * prior + w_mean * mean + w_xrec * xrec
+                + w_zcyc * zcycle + w_kl * kl_loss
+                + w_rollout * rollout_loss + w_imb * imbalance_loss)
         logs = {
             "prior": float(prior.detach().cpu()),
             "mean": float(mean.detach().cpu()),
             "xrec": float(xrec.detach().cpu()),
             "zcycle": float(zcycle.detach().cpu()),
             "kl": float(kl_loss.detach().cpu()),
+            "rollout": float(rollout_loss.detach().cpu()),
+            "imbalance": float(imbalance_loss.detach().cpu()),
             "loss": float(loss.detach().cpu()),
         }
         return loss, logs

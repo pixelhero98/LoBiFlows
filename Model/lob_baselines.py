@@ -106,6 +106,13 @@ class LOBConfig:
     lr_schedule: str = "cosine"      # "cosine" | "constant" LR scheduler
     lambda_kl: float = 0.01          # KL weight for conditional prior
 
+    # Rollout loss (multi-step Euler consistency)
+    lambda_rollout: float = 0.0      # weight; 0 = disabled
+    rollout_steps_range: Tuple[int, int] = (2, 4)  # random K sampled from [lo, hi]
+
+    # Imbalance loss (LOB microstructure constraint)
+    lambda_imbalance: float = 0.0    # weight; 0 = disabled
+
     # -----------------------------
     # Transformer f/u-net (Phase 4)
     # -----------------------------

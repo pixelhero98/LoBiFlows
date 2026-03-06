@@ -234,6 +234,70 @@ def test_lobiflow_transformer_forward():
     out2 = model.sample(hist, cond=cond, steps=3)
     assert out2.shape == (B, D), f"Multi-step sample shape mismatch: got {out2.shape}"
 
+def test_imbalance_loss():
+    """Test that imbalance loss activates on violated LOB data and is zero when disabled."""
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+    # With imbalance enabled
+    cfg = LOBConfig(levels=5, history_len=20, cond_dim=0, hidden_dim=64,
+                     lambda_imbalance=1.0)
+    model = LoBiFlow(cfg)
+    B, H, D = 4, 20, cfg.state_dim
+    hist = torch.randn(B, H, D)
+    tgt = torch.randn(B, D)  # random data will likely have violations
+    loss, logs = model.loss(tgt, hist)
+    assert "imbalance" in logs, "imbalance key missing from logs"
+    assert logs["imbalance"] >= 0.0, "imbalance loss should be non-negative"
+    # With imbalance disabled (default)
+    cfg0 = LOBConfig(levels=5, history_len=20, cond_dim=0, hidden_dim=64,
+                      lambda_imbalance=0.0)
+    model0 = LoBiFlow(cfg0)
+    _, logs0 = model0.loss(tgt, hist)
+    assert logs0["imbalance"] == 0.0, f"imbalance should be 0 when disabled, got {logs0['imbalance']}"
+
+def test_rollout_loss():
+    """Test that rollout loss computes correctly and is zero when disabled."""
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+    # With rollout enabled
+    cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
+                     lambda_rollout=1.0, rollout_steps_range=(2, 3))
+    model = LoBiFlow(cfg)
+    B, H, D = 4, 20, cfg.state_dim
+    hist = torch.randn(B, H, D)
+    tgt = torch.randn(B, D)
+    cond = torch.randn(B, 7)
+    loss, logs = model.loss(tgt, hist, cond=cond)
+    assert "rollout" in logs, "rollout key missing from logs"
+    assert logs["rollout"] > 0.0, f"rollout loss should be positive, got {logs['rollout']}"
+    assert torch.isfinite(loss), "loss should be finite"
+    # With rollout disabled (default)
+    cfg0 = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
+                      lambda_rollout=0.0)
+    model0 = LoBiFlow(cfg0)
+    _, logs0 = model0.loss(tgt, hist, cond=cond)
+    assert logs0["rollout"] == 0.0, f"rollout should be 0 when disabled, got {logs0['rollout']}"
+
+def test_loss_new_terms_combined():
+    """Test both rollout and imbalance losses enabled together with gradient flow."""
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+    cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
+                     lambda_rollout=0.5, lambda_imbalance=0.1,
+                     rollout_steps_range=(2, 4))
+    model = LoBiFlow(cfg)
+    B, H, D = 4, 20, cfg.state_dim
+    hist = torch.randn(B, H, D)
+    tgt = torch.randn(B, D)
+    cond = torch.randn(B, 7)
+    loss, logs = model.loss(tgt, hist, cond=cond)
+    assert loss.shape == (), f"Loss should be scalar, got {loss.shape}"
+    assert "rollout" in logs and "imbalance" in logs
+    # Verify backward pass succeeds (gradient flow through both paths)
+    loss.backward()
+    grad_count = sum(1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0)
+    assert grad_count > 0, "Gradients should flow to model parameters"
+
 def test_train_loop_short():
     from lob_baselines import LOBConfig
     from lob_datasets import build_dataset_splits_synthetic
@@ -300,6 +364,9 @@ def main():
         ("biflow_nf_forward", test_biflow_nf_forward),
         ("transformer_fu_net", test_transformer_fu_net),
         ("lobiflow_transformer_forward", test_lobiflow_transformer_forward),
+        ("imbalance_loss", test_imbalance_loss),
+        ("rollout_loss", test_rollout_loss),
+        ("loss_new_terms_combined", test_loss_new_terms_combined),
         ("train_loop_short", test_train_loop_short),
         ("eval_pipeline", test_eval_pipeline),
         ("utils", test_utils),
