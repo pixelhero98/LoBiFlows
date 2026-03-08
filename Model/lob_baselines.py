@@ -45,10 +45,12 @@ class LOBConfig:
     cfg_dropout: float = 0.1  # classifier-free guidance style drop for cond/context
 
     # LoBiFlow loss weights (ours)
-    lambda_prior: float = 1.0
+    lambda_prior: float = 1.0e-3
     lambda_mean: float = 1.0
     lambda_xrec: float = 1.0
     lambda_zcycle: float = 0.1
+    lambda_pair = 0.25
+    pair_align_weight = 0.25
 
     # Optional: conditional Gaussian prior over z (helps 1-NFE)
     conditional_prior: bool = False
@@ -109,7 +111,7 @@ class LOBConfig:
     # Objective Weights
     lambda_mean: float = 1.0
     lambda_consistency: float = 0.0
-    lambda_imbalance: float = 0.0
+    lambda_imbalance: float = 0.05
 
     # OT Flow Matching
     use_minibatch_ot: bool = True
