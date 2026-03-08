@@ -89,8 +89,9 @@ def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
     cfg = LOBConfig()
 
     # Common overrides (only applied if field exists)
+    import torch as _torch
     overrides = {
-        "device": args.device,
+        "device": _torch.device(args.device),
         "levels": args.levels,
         "history_len": args.history_len,
         "batch_size": args.batch_size,
@@ -111,6 +112,19 @@ def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
         _safe_cfg_set(cfg, "model_dim", args.model_dim)
     if args.ctx_encoder is not None:
         _safe_cfg_set(cfg, "ctx_encoder", args.ctx_encoder)
+
+    # Optional loss weights
+    if args.lambda_zcycle is not None:
+        cfg.lambda_zcycle = args.lambda_zcycle
+    if args.lambda_consistency is not None:
+        cfg.lambda_consistency = args.lambda_consistency
+    if args.lambda_imbalance is not None:
+        cfg.lambda_imbalance = args.lambda_imbalance
+        
+    if hasattr(args, "use_minibatch_ot") and args.use_minibatch_ot:
+        cfg.use_minibatch_ot = True
+    if hasattr(args, "cfg_scale") and args.cfg_scale is not None:
+        cfg.cfg_scale = args.cfg_scale
 
     # Conditioning depths / vol window if present
     if args.cond_depths:
@@ -472,6 +486,15 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--hidden_dim", type=int, default=None)
     ap.add_argument("--model_dim", type=int, default=None)
     ap.add_argument("--ctx_encoder", type=str, default=None)
+
+    # Optional loss weights
+    ap.add_argument("--lambda_zcycle", type=float, default=None)
+    ap.add_argument("--lambda_consistency", type=float, default=None)
+    ap.add_argument("--lambda_imbalance", type=float, default=None)
+
+    # New v2.1 Configs
+    ap.add_argument("--use_minibatch_ot", action="store_true", default=False, help="Enable Minibatch Optimal Transport Matching")
+    ap.add_argument("--cfg_scale", type=float, default=None, help="Classifier-Free Guidance Scale for inference")
 
     # Training budget
     ap.add_argument("--steps", type=int, default=5000, help="Training steps for lobiflow/biflow")

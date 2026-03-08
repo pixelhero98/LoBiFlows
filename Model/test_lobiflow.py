@@ -152,7 +152,7 @@ def test_lobiflow_forward():
     cond = torch.randn(B, 7)
     loss, logs = model.loss(tgt, hist, cond=cond)
     assert loss.shape == (), f"Loss should be scalar, got {loss.shape}"
-    assert "prior" in logs and "mean" in logs and "xrec" in logs and "zcycle" in logs and "kl" in logs
+    assert "mean" in logs and "consistency" in logs and "imbalance" in logs
     # Sampling
     out = model.sample(hist, cond=cond, steps=1)
     assert out.shape == (B, D), f"Sample shape mismatch: got {out.shape}"
@@ -227,7 +227,7 @@ def test_lobiflow_transformer_forward():
     cond = torch.randn(B, 7)
     loss, logs = model.loss(tgt, hist, cond=cond)
     assert loss.shape == (), f"Loss should be scalar, got {loss.shape}"
-    assert "prior" in logs and "mean" in logs and "xrec" in logs and "zcycle" in logs
+    assert "mean" in logs and "consistency" in logs and "imbalance" in logs
     # Sampling
     out = model.sample(hist, cond=cond, steps=1)
     assert out.shape == (B, D), f"Sample shape mismatch: got {out.shape}"
@@ -255,36 +255,35 @@ def test_imbalance_loss():
     _, logs0 = model0.loss(tgt, hist)
     assert logs0["imbalance"] == 0.0, f"imbalance should be 0 when disabled, got {logs0['imbalance']}"
 
-def test_rollout_loss():
-    """Test that rollout loss computes correctly and is zero when disabled."""
+def test_consistency_loss():
+    """Test that consistency loss computes correctly and is zero when disabled."""
     from lob_baselines import LOBConfig
     from lob_model import LoBiFlow
-    # With rollout enabled
+    # With consistency enabled
     cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                     lambda_rollout=1.0, rollout_steps_range=(2, 3))
+                     lambda_consistency=1.0)
     model = LoBiFlow(cfg)
     B, H, D = 4, 20, cfg.state_dim
     hist = torch.randn(B, H, D)
     tgt = torch.randn(B, D)
     cond = torch.randn(B, 7)
     loss, logs = model.loss(tgt, hist, cond=cond)
-    assert "rollout" in logs, "rollout key missing from logs"
-    assert logs["rollout"] > 0.0, f"rollout loss should be positive, got {logs['rollout']}"
+    assert "consistency" in logs, "consistency key missing from logs"
+    assert logs["consistency"] > 0.0, f"consistency loss should be positive, got {logs['consistency']}"
     assert torch.isfinite(loss), "loss should be finite"
-    # With rollout disabled (default)
+    # With consistency disabled (default)
     cfg0 = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                      lambda_rollout=0.0)
+                      lambda_consistency=0.0)
     model0 = LoBiFlow(cfg0)
     _, logs0 = model0.loss(tgt, hist, cond=cond)
-    assert logs0["rollout"] == 0.0, f"rollout should be 0 when disabled, got {logs0['rollout']}"
+    assert logs0["consistency"] == 0.0, f"consistency should be 0 when disabled, got {logs0['consistency']}"
 
 def test_loss_new_terms_combined():
-    """Test both rollout and imbalance losses enabled together with gradient flow."""
+    """Test both consistency and imbalance losses enabled together with gradient flow."""
     from lob_baselines import LOBConfig
     from lob_model import LoBiFlow
     cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                     lambda_rollout=0.5, lambda_imbalance=0.1,
-                     rollout_steps_range=(2, 4))
+                     lambda_consistency=0.5, lambda_imbalance=0.1)
     model = LoBiFlow(cfg)
     B, H, D = 4, 20, cfg.state_dim
     hist = torch.randn(B, H, D)
@@ -292,7 +291,7 @@ def test_loss_new_terms_combined():
     cond = torch.randn(B, 7)
     loss, logs = model.loss(tgt, hist, cond=cond)
     assert loss.shape == (), f"Loss should be scalar, got {loss.shape}"
-    assert "rollout" in logs and "imbalance" in logs
+    assert "consistency" in logs and "imbalance" in logs
     # Verify backward pass succeeds (gradient flow through both paths)
     loss.backward()
     grad_count = sum(1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0)
@@ -365,7 +364,7 @@ def main():
         ("transformer_fu_net", test_transformer_fu_net),
         ("lobiflow_transformer_forward", test_lobiflow_transformer_forward),
         ("imbalance_loss", test_imbalance_loss),
-        ("rollout_loss", test_rollout_loss),
+        ("consistency_loss", test_consistency_loss),
         ("loss_new_terms_combined", test_loss_new_terms_combined),
         ("train_loop_short", test_train_loop_short),
         ("eval_pipeline", test_eval_pipeline),

@@ -80,7 +80,7 @@ class LOBConfig:
     # -----------------------------
     # Context encoder upgrades
     # -----------------------------
-    ctx_encoder: str = "transformer"   # "lstm" | "transformer"
+    ctx_encoder: str = "multiscale"   # "lstm" | "transformer" | "multiscale"
     ctx_heads: int = 4
     ctx_layers: int = 2
 
@@ -106,17 +106,24 @@ class LOBConfig:
     lr_schedule: str = "cosine"      # "cosine" | "constant" LR scheduler
     lambda_kl: float = 0.01          # KL weight for conditional prior
 
-    # Rollout loss (multi-step Euler consistency)
-    lambda_rollout: float = 0.0      # weight; 0 = disabled
-    rollout_steps_range: Tuple[int, int] = (2, 4)  # random K sampled from [lo, hi]
+    # Objective Weights
+    lambda_mean: float = 1.0
+    lambda_consistency: float = 0.0
+    lambda_imbalance: float = 0.0
 
-    # Imbalance loss (LOB microstructure constraint)
-    lambda_imbalance: float = 0.0    # weight; 0 = disabled
+    # OT Flow Matching
+    use_minibatch_ot: bool = True
+
+    # Generation Inference
+    cfg_scale: float = 1.0
+
+    # Training Stability (v2.2)
+    use_swa: bool = True
 
     # -----------------------------
-    # Transformer f/u-net (Phase 4)
+    # Transformer f/u-net (Phase 4 / v2.2)
     # -----------------------------
-    fu_net_type: str = "mlp"         # "mlp" | "transformer" — backbone for f_net/u_net
+    fu_net_type: str = "transformer" # "mlp" | "transformer" — backbone for f_net/u_net
     fu_net_layers: int = 3           # number of TransformerFUBlocks in f/u-net
     fu_net_heads: int = 4            # attention heads in f/u-net Transformer
 
@@ -218,21 +225,77 @@ class AdaLN(nn.Module):
         return scale * self.norm(x) + shift
 
 
+# ---------------------------------------------------------
+# RoPE Utilities
+# ---------------------------------------------------------
+def compute_rope_freqs(seq_len: int, dim: int, base: float = 10000.0, device: torch.device = None) -> torch.Tensor:
+    """Compute RoPE frequencies for a given sequence length and dimension."""
+    inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2, device=device).float() / dim))
+    t = torch.arange(seq_len, device=device).float()
+    freqs = torch.outer(t, inv_freq)
+    return freqs
+
+def apply_rotary_pos_emb(x: torch.Tensor, freqs: torch.Tensor) -> torch.Tensor:
+    """Apply RoPE to x.
+    x: [B, N, n_heads, head_dim]
+    freqs: [N, head_dim // 2]
+    """
+    x_real, x_imag = x.reshape(*x.shape[:-1], -1, 2).unbind(-1)
+    cos = torch.cos(freqs).unsqueeze(0).unsqueeze(2)  # [1, N, 1, head_dim//2]
+    sin = torch.sin(freqs).unsqueeze(0).unsqueeze(2)  # [1, N, 1, head_dim//2]
+    out_real = x_real * cos - x_imag * sin
+    out_imag = x_real * sin + x_imag * cos
+    return torch.stack([out_real, out_imag], dim=-1).flatten(-2)
+
+class RoPEAttention(nn.Module):
+    """Multi-Head Self-Attention with Rotary Positional Embeddings."""
+    def __init__(self, hidden_dim: int, n_heads: int, dropout: float = 0.0):
+        super().__init__()
+        assert hidden_dim % n_heads == 0
+        self.hidden_dim = hidden_dim
+        self.n_heads = n_heads
+        self.head_dim = hidden_dim // n_heads
+        
+        self.qkv = nn.Linear(hidden_dim, 3 * hidden_dim)
+        self.out_proj = nn.Linear(hidden_dim, hidden_dim)
+        self.dropout = nn.Dropout(dropout)
+
+    def forward(self, x: torch.Tensor, freqs: torch.Tensor) -> torch.Tensor:
+        B, N, C = x.shape
+        qkv = self.qkv(x).reshape(B, N, 3, self.n_heads, self.head_dim).permute(2, 0, 1, 3, 4)
+        q, k, v = qkv[0], qkv[1], qkv[2]  # [B, N, heads, head_dim]
+
+        # Apply RoPE
+        q = apply_rotary_pos_emb(q, freqs)
+        k = apply_rotary_pos_emb(k, freqs)
+
+        # Attention
+        q = q.transpose(1, 2)  # [B, heads, N, head_dim]
+        k = k.transpose(1, 2)
+        v = v.transpose(1, 2)
+        
+        scores = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(self.head_dim)
+        attn = F.softmax(scores, dim=-1)
+        attn = self.dropout(attn)
+        
+        out = torch.matmul(attn, v)  # [B, heads, N, head_dim]
+        out = out.transpose(1, 2).reshape(B, N, C)
+        return self.out_proj(out)
+
+
 class TransformerFUBlock(nn.Module):
-    """Single Transformer block for f/u-net with AdaLN conditioning.
+    """Single Transformer block for f/u-net with AdaLN conditioning and RoPE.
 
     Sub-layers (all with residual connections):
-        1. AdaLN → Multi-Head Self-Attention across LOB level tokens
+        1. AdaLN → RoPE Self-Attention across LOB level tokens
         2. AdaLN → Multi-Head Cross-Attention (query=levels, kv=history ctx_tokens)
         3. AdaLN → Feed-Forward Network (SiLU MLP)
     """
     def __init__(self, hidden_dim: int, n_heads: int, dropout: float = 0.0):
         super().__init__()
-        # Self-attention
+        # Self-attention with RoPE
         self.adaln_sa = AdaLN(hidden_dim, hidden_dim)
-        self.self_attn = nn.MultiheadAttention(
-            hidden_dim, num_heads=n_heads, batch_first=True, dropout=dropout,
-        )
+        self.self_attn = RoPEAttention(hidden_dim, n_heads, dropout=dropout)
         # Cross-attention to history
         self.adaln_ca = AdaLN(hidden_dim, hidden_dim)
         self.cross_attn = nn.MultiheadAttention(
@@ -253,11 +316,17 @@ class TransformerFUBlock(nn.Module):
         x: torch.Tensor,
         ctx_tokens: torch.Tensor,
         adaln_cond: torch.Tensor,
+        freqs: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        """x: [B, N, H] level tokens;  ctx_tokens: [B, T, H];  adaln_cond: [B, H]."""
-        # Self-attention
+        """x: [B, N, H] level tokens;  ctx_tokens: [B, T, H];  adaln_cond: [B, H]; freqs: [N, head_dim//2]."""
+        # Self-attention with RoPE
         h = self.adaln_sa(x, adaln_cond)
-        h, _ = self.self_attn(h, h, h, need_weights=False)
+        if freqs is not None:
+            h = self.self_attn(h, freqs)
+        else:
+            # Fallback if freqs not provided (shouldn't happen in configured path)
+            dummy_freqs = compute_rope_freqs(x.shape[1], self.self_attn.head_dim, device=x.device)
+            h = self.self_attn(h, dummy_freqs)
         x = x + h
         # Cross-attention to history
         h = self.adaln_ca(x, adaln_cond)
@@ -291,11 +360,15 @@ class TransformerFUNet(nn.Module):
 
         # Input: project each 4-d level token to H
         self.in_proj = nn.Linear(self.token_dim, H)
-        self.level_pos = nn.Parameter(torch.zeros(1, cfg.levels, H))
+        
+        # RoPE frequencies buffer (lazily initialized using maximum known levels, usually 10)
+        # We don't use Absolute Positional Embeddings (level_pos) anymore for the token stream.
+        head_dim = H // cfg.fu_net_heads
+        self.register_buffer("rope_freqs", compute_rope_freqs(cfg.levels, head_dim), persistent=False)
 
         # Transformer blocks
         self.blocks = nn.ModuleList([
-            TransformerFUBlock(H, cfg.fu_net_heads, dropout=cfg.dropout)
+            TransformerFUBlock(H, cfg.fu_net_heads, cfg.dropout) 
             for _ in range(cfg.fu_net_layers)
         ])
 
@@ -310,14 +383,25 @@ class TransformerFUNet(nn.Module):
         adaln_cond: torch.Tensor,
     ) -> torch.Tensor:
         B = x.shape[0]
-        # Tokenize: (B, 4*levels) -> (B, levels, 4)
-        tokens = x.view(B, self.levels, self.token_dim)
-        h = self.in_proj(tokens) + self.level_pos
+        # x is [B, state_dim]
+        # Reshape to [B, levels, 4]
+        seq = x.view(B, self.levels, self.token_dim)
+        
+        # Project tokens to hidden dim [B, levels, H]
+        h = self.in_proj(seq)
+        
+        # Ensure rope_freqs is correctly dimensioned (handles dynamic device/shape if needed)
+        if self.rope_freqs.device != h.device or self.rope_freqs.shape[0] != self.levels:
+            head_dim = h.shape[-1] // self.blocks[0].self_attn.n_heads
+            self.rope_freqs = compute_rope_freqs(self.levels, head_dim, device=h.device)
+            
+        freqs = self.rope_freqs
 
+        # Apply blocks
         for blk in self.blocks:
-            h = blk(h, ctx_tokens, adaln_cond)
+            h = blk(h, ctx_tokens, adaln_cond, freqs)
 
-        # Readout: (B, levels, H) -> (B, levels, 4) -> (B, 4*levels)
+        # Readout: Flatten [B, levels, H] -> [B, levels*H]
         h = self.out_adaln(h, adaln_cond)
         out = self.out_proj(h)
         return out.reshape(B, -1)
@@ -476,12 +560,62 @@ class TransformerContextEncoder(nn.Module):
         pooled = h[:, -1, :]
         return h, pooled
 
+class MultiScaleContextEncoder(nn.Module):
+    """Hierarchical temporal pooling to aggregate dense step histories.
+    
+    Processes the raw history using a standard TransformerContextEncoder,
+    but also explicitly average-pools the input at multiple temporal scales
+    (e.g., windows of 5 and 10) to preserve long-term macro information
+    without choking the cross-attention layers.
+    """
+    def __init__(self, cfg: LOBConfig):
+        super().__init__()
+        self.base_encoder = TransformerContextEncoder(cfg)
+        self.scales = [1, 5, 10]
+        
+        # We'll project the pooled tokens from the original state_dim to hidden_dim
+        self.pool_projs = nn.ModuleList([
+            nn.Linear(cfg.state_dim, cfg.hidden_dim) for _ in self.scales[1:]
+        ])
+        
+    def forward(self, ctx: torch.Tensor) -> Tuple[torch.Tensor, torch.Tensor]:
+        # base processing (scale = 1) -> [B, T, H]
+        h_base, pooled_base = self.base_encoder(ctx)
+        
+        B, T, D = ctx.shape
+        multi_scale_tokens = [h_base]
+        
+        # Add pooled macroscopic context tokens
+        for i, scale in enumerate(self.scales[1:]):
+            if T >= scale:
+                # Average pool along the time dimension
+                remainder = T % scale
+                if remainder != 0:
+                    # discard oldest odd tokens if it doesn't divide evenly
+                    ctx_crop = ctx[:, remainder:, :]
+                else:
+                    ctx_crop = ctx
+                    
+                # shape: [B, T_crop // scale, scale, D]
+                pooled_ctx = ctx_crop.view(B, -1, scale, D).mean(dim=2)
+                # project to hidden_dim: [B, T_crop // scale, H]
+                proj_ctx = self.pool_projs[i](pooled_ctx)
+                multi_scale_tokens.append(proj_ctx)
+                
+        # Concatenate all resolution tokens along the sequence dimension
+        h_multi = torch.cat(multi_scale_tokens, dim=1)
+        
+        # The ultimate 'pooled' vector for generic MLP passes remains the last fine-grained token
+        return h_multi, pooled_base
+
 
 def build_context_encoder(cfg: LOBConfig) -> nn.Module:
     if cfg.ctx_encoder.lower() == "lstm":
         return LSTMContextEncoder(cfg)
     if cfg.ctx_encoder.lower() == "transformer":
         return TransformerContextEncoder(cfg)
+    if cfg.ctx_encoder.lower() == "multiscale":
+        return MultiScaleContextEncoder(cfg)
     raise ValueError(f"Unknown ctx_encoder={cfg.ctx_encoder}")
 
 

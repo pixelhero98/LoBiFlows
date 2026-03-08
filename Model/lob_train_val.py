@@ -21,6 +21,7 @@ import time
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
+from torch.optim.swa_utils import AveragedModel
 
 from lob_baselines import LOBConfig, BiFlowLOB, BiFlowNFLOB
 from lob_model import LoBiFlow
@@ -160,6 +161,11 @@ def train_loop(
     ema_decay = float(getattr(cfg, "ema_decay", 0.0))
     ema = EMAModel(model, decay=ema_decay) if ema_decay > 0 else None
 
+    # SWA
+    use_swa = getattr(cfg, "use_swa", False)
+    swa_model = AveragedModel(model) if use_swa else None
+    swa_start = int(0.75 * steps)
+
     model.train()
     it = iter(loader)
     for step in range(1, steps + 1):
@@ -207,12 +213,19 @@ def train_loop(
         if ema is not None:
             ema.update(model)
 
+        if swa_model is not None and step >= swa_start:
+            swa_model.update_parameters(model)
+
         if step % log_every == 0:
             lr_now = opt.param_groups[0]["lr"]
             print(f"[{model_name}] step {step}/{steps}  loss={logs.get('loss', float(loss.detach())):.4f}  lr={lr_now:.2e}  details={logs}")
 
-    # Apply EMA weights for evaluation
-    if ema is not None:
+    # Apply SWA weights if used
+    if swa_model is not None:
+        print(f"[{model_name}] Applying SWA weights tracked over the last {steps - swa_start + 1} steps")
+        model.load_state_dict(swa_model.module.state_dict())
+    # Apply EMA weights for evaluation (overrides SWA if both are enabled, but usually one is chosen)
+    elif ema is not None:
         ema.apply_shadow(model)
 
     return model.eval()
