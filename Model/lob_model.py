@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
@@ -35,14 +36,13 @@ class LoBiFlow(nn.Module):
         self.cond_emb = CondEmbedder(cfg)
         self.cross = CrossAttentionConditioner(cfg)
         self.x_proj = nn.Linear(D, H)
+        self.ctx_pool_proj = nn.Linear(H, H)
+        self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
 
         if self.use_transformer:
             self.use_film = False
             self.v_net = TransformerFUNet(cfg)
         else:
-            self.ctx_pool_proj = nn.Linear(H, H)
-            self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
-
             self.use_film = use_film
             if use_film:
                 self.film_t = FiLMModulation(H, H)
@@ -52,6 +52,17 @@ class LoBiFlow(nn.Module):
                 self.film_cond = None
                 v_in = D + H + H + (H if cfg.cond_dim > 0 else 0)
             self.v_net = build_mlp(v_in, H, D, dropout=cfg.dropout, use_res=use_res)
+
+        self.z_body = nn.Sequential(
+            nn.LayerNorm(H),
+            nn.Linear(H, H),
+            nn.SiLU(),
+            nn.Dropout(cfg.dropout),
+        )
+        self.z_mu = nn.Linear(H, D)
+        self.z_logvar = nn.Linear(H, D)
+        self.align_data = nn.Linear(H, H)
+        self.align_pred = nn.Linear(H, H)
 
         self.register_buffer("scaler_mu", torch.zeros(D), persistent=False)
         self.register_buffer("scaler_sigma", torch.ones(D), persistent=False)
@@ -95,21 +106,45 @@ class LoBiFlow(nn.Module):
         avg_pool = self.ctx_pool_proj(ctx_tokens.mean(dim=1))
         return self.ctx_merge(torch.cat([cross_out, avg_pool], dim=-1))
 
-    def _prep(self, hist: torch.Tensor, x_ref: torch.Tensor, t: torch.Tensor, cond: Optional[torch.Tensor]):
+    def _prep(
+        self,
+        hist: torch.Tensor,
+        x_ref: torch.Tensor,
+        t: torch.Tensor,
+        cond: Optional[torch.Tensor],
+        apply_cfg_dropout: bool = True,
+    ):
         ctx_tokens, _ = self.ctx_enc(hist)
         t_e = self.cond_emb.embed_t(t)
         c_e = self.cond_emb.embed_cond(cond)
-        c_e = self._maybe_drop_cond(c_e)
+        if apply_cfg_dropout:
+            c_e = self._maybe_drop_cond(c_e)
         q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
         cross_out = self.cross(q, ctx_tokens)
-
-        if self.use_transformer:
-            return ctx_tokens, None, t_e, c_e
         ctx = self._multiscale_ctx(ctx_tokens, cross_out)
         return ctx_tokens, ctx, t_e, c_e
 
     def _adaln_cond(self, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> torch.Tensor:
         return t_e + c_e if c_e is not None else t_e
+
+    def encode_latent(
+        self,
+        x: torch.Tensor,
+        hist: torch.Tensor,
+        cond: Optional[torch.Tensor] = None,
+        sample: bool = True,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
+        t = torch.ones(x.shape[0], 1, device=x.device)
+        _, ctx, _, _ = self._prep(hist, x, t, cond, apply_cfg_dropout=False)
+        feat = self.z_body(ctx)
+        mu = self.z_mu(feat)
+        logvar = self.z_logvar(feat).clamp(-8.0, 8.0)
+        if sample:
+            eps = torch.randn_like(mu)
+            z = mu + torch.exp(0.5 * logvar) * eps
+        else:
+            z = mu
+        return z, mu, logvar, feat
 
     def v_forward(
         self,
@@ -118,7 +153,7 @@ class LoBiFlow(nn.Module):
         hist: torch.Tensor,
         cond: Optional[torch.Tensor] = None,
     ) -> torch.Tensor:
-        ctx_tokens, ctx, t_e, c_e = self._prep(hist, x_t, t, cond)
+        ctx_tokens, ctx, t_e, c_e = self._prep(hist, x_t, t, cond, apply_cfg_dropout=True)
 
         if self.use_transformer:
             return self.v_net(x_t, ctx_tokens, self._adaln_cond(t_e, c_e))
@@ -168,6 +203,24 @@ class LoBiFlow(nn.Module):
         x_pred_2 = x_next + (1 - t_next) * v_next
         return F.mse_loss(x_pred_2, x_pred_1)
 
+    def _kl_prior_loss(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
+        return 0.5 * (mu.pow(2) + logvar.exp() - 1.0 - logvar).mean()
+
+    def _pair_loss(
+        self,
+        x_pred: torch.Tensor,
+        hist: torch.Tensor,
+        cond: Optional[torch.Tensor],
+        mu_target: torch.Tensor,
+        feat_target: torch.Tensor,
+    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        _, mu_pred, _, feat_pred = self.encode_latent(x_pred, hist, cond=cond, sample=False)
+        latent_loss = F.mse_loss(mu_pred, mu_target.detach())
+        hidden_loss = F.mse_loss(self.align_pred(feat_pred), self.align_data(feat_target.detach()))
+        align_w = float(getattr(self.cfg, "pair_align_weight", 0.25))
+        pair_loss = latent_loss + align_w * hidden_loss
+        return pair_loss, latent_loss, hidden_loss
+
     def loss(
         self,
         x: torch.Tensor,
@@ -178,14 +231,30 @@ class LoBiFlow(nn.Module):
         B = x.shape[0]
         D = self.cfg.state_dim
 
-        z = torch.randn(B, D, device=x.device)
+        use_paired_encoder = bool(getattr(self.cfg, "use_paired_encoder", True))
+        pair_regularizer = bool(getattr(self.cfg, "use_pair_regularizer", use_paired_encoder))
 
-        use_ot = getattr(self.cfg, "use_minibatch_ot", True)
-        if use_ot and B > 1:
-            with torch.no_grad():
-                dist_mat = torch.cdist(x, z, p=2.0) ** 2
-                _, col_ind = scipy.optimize.linear_sum_assignment(dist_mat.cpu().numpy())
-                z = z[col_ind]
+        prior_loss = torch.tensor(0.0, device=x.device)
+        pair_loss = torch.tensor(0.0, device=x.device)
+        latent_loss = torch.tensor(0.0, device=x.device)
+        hidden_loss = torch.tensor(0.0, device=x.device)
+
+        if use_paired_encoder:
+            z, mu, logvar, feat_x = self.encode_latent(x, hist, cond=cond, sample=self.training)
+            prior_loss = self._kl_prior_loss(mu, logvar)
+        else:
+            z = torch.randn(B, D, device=x.device)
+            feat_x = torch.empty(B, 0, device=x.device)
+            mu = z
+            logvar = torch.zeros_like(z)
+            use_ot = getattr(self.cfg, "use_minibatch_ot", True)
+            if use_ot and B > 1:
+                with torch.no_grad():
+                    dist_mat = torch.cdist(x, z, p=2.0) ** 2
+                    _, col_ind = scipy.optimize.linear_sum_assignment(dist_mat.cpu().numpy())
+                    z = z[col_ind]
+                    mu = mu[col_ind]
+                    logvar = logvar[col_ind]
 
         t = torch.rand(B, 1, device=x.device)
         x_t = (1 - t) * z + t * x
@@ -200,21 +269,40 @@ class LoBiFlow(nn.Module):
         if w_imb > 0.0:
             imbalance_loss = self._imbalance_loss(x_pred)
 
-        w_consistency = float(getattr(self.cfg, "lambda_consistency", 0.0))
+        if use_paired_encoder and pair_regularizer:
+            pair_loss, latent_loss, hidden_loss = self._pair_loss(x_pred, hist, cond, mu, feat_x)
+
+        use_consistency = (not pair_regularizer) and float(getattr(self.cfg, "lambda_consistency", 0.0)) > 0.0
         consistency_loss = torch.tensor(0.0, device=x.device)
         consistency_steps = 0
-        if w_consistency > 0.0:
+        if use_consistency:
             consistency_steps = self._consistency_steps()
             consistency_loss = self._consistency_loss(x_t, t, v_hat, hist, cond, steps=consistency_steps)
 
         w_fm = float(getattr(self.cfg, "lambda_mean", 1.0))
-        loss = w_fm * mean_loss + w_consistency * consistency_loss + w_imb * imbalance_loss
+        w_pair = float(getattr(self.cfg, "lambda_pair", 0.25))
+        w_prior = float(getattr(self.cfg, "lambda_prior", 1e-3)) if use_paired_encoder else 0.0
+        w_consistency = float(getattr(self.cfg, "lambda_consistency", 0.0)) if use_consistency else 0.0
+
+        loss = (
+            w_fm * mean_loss
+            + w_pair * pair_loss
+            + w_prior * prior_loss
+            + w_consistency * consistency_loss
+            + w_imb * imbalance_loss
+        )
 
         logs = {
             "mean": float(mean_loss.detach().cpu()),
+            "pair": float(pair_loss.detach().cpu()),
+            "latent": float(latent_loss.detach().cpu()),
+            "hidden": float(hidden_loss.detach().cpu()),
+            "prior": float(prior_loss.detach().cpu()),
             "consistency": float(consistency_loss.detach().cpu()),
             "imbalance": float(imbalance_loss.detach().cpu()),
             "consistency_steps": float(consistency_steps),
+            "paired_encoder": float(use_paired_encoder),
+            "pair_regularizer": float(pair_regularizer),
             "loss": float(loss.detach().cpu()),
         }
         return loss, logs
