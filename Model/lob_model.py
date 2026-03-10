@@ -2,17 +2,11 @@ from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-import numpy as np
 import torch
 import torch.nn.functional as F
 
-try:
-    # Flat-folder / script usage
-    from lob_baselines import LOBConfig, RectifiedFlowLOB
-except Exception:
-    # Package usage
-    from .config import LOBConfig
-    from .baselines import RectifiedFlowLOB
+from .baselines import RectifiedFlowLOB
+from .config import LOBConfig
 
 
 class LoBiFlow(RectifiedFlowLOB):
@@ -33,35 +27,12 @@ class LoBiFlow(RectifiedFlowLOB):
 
     def __init__(self, cfg: LOBConfig):
         # Force the conditioning backbone to use multiscale context.
-        try:
-            cfg.apply_overrides(ctx_encoder="multiscale")
-        except Exception:
-            try:
-                cfg.model.ctx_encoder = "multiscale"
-            except Exception:
-                pass
+        cfg.apply_overrides(ctx_encoder="multiscale")
 
         super().__init__(cfg)
 
-        # Optional scaler compatibility hooks.
-        self.register_buffer("scaler_mu", torch.zeros(cfg.state_dim), persistent=False)
-        self.register_buffer("scaler_sigma", torch.ones(cfg.state_dim), persistent=False)
-        self.has_scaler = False
-
-    def set_scaler(self, mu: np.ndarray, sigma: np.ndarray) -> None:
-        mu_t = torch.as_tensor(mu, dtype=torch.float32, device=self.scaler_mu.device)
-        sigma_t = torch.as_tensor(sigma, dtype=torch.float32, device=self.scaler_sigma.device)
-        if mu_t.numel() != self.scaler_mu.numel():
-            raise ValueError("Scaler dimension mismatch.")
-        self.scaler_mu.copy_(mu_t)
-        self.scaler_sigma.copy_(sigma_t)
-        self.has_scaler = True
-
     def _consistency_steps(self) -> int:
-        try:
-            return int(max(2, self.cfg.sample.steps))
-        except Exception:
-            return 32
+        return int(max(2, self.cfg.sample.steps))
 
     def _imbalance_loss(self, x: torch.Tensor) -> torch.Tensor:
         """Soft LOB validity constraints.
@@ -69,15 +40,8 @@ class LoBiFlow(RectifiedFlowLOB):
         Assumes state layout:
             [bid_p(L), bid_v(L), ask_p(L), ask_v(L)]
         """
-        try:
-            levels = int(self.cfg.data.levels)
-        except Exception:
-            levels = int(self.cfg.levels)
-
-        try:
-            eps = float(self.cfg.train.eps)
-        except Exception:
-            eps = float(getattr(self.cfg, "eps", 1e-8))
+        levels = int(self.cfg.data.levels)
+        eps = float(self.cfg.train.eps)
 
         bid_p = x[:, 0:levels]
         bid_v = x[:, levels : 2 * levels]
@@ -149,20 +113,9 @@ class LoBiFlow(RectifiedFlowLOB):
 
         x_pred = x_t + (1.0 - t) * v_hat
 
-        try:
-            w_mean = float(self.cfg.fm.lambda_mean)
-        except Exception:
-            w_mean = float(getattr(self.cfg, "lambda_mean", 1.0))
-
-        try:
-            w_imb = float(self.cfg.fm.lambda_imbalance)
-        except Exception:
-            w_imb = float(getattr(self.cfg, "lambda_imbalance", 0.0))
-
-        try:
-            w_cons = float(self.cfg.fm.lambda_consistency)
-        except Exception:
-            w_cons = float(getattr(self.cfg, "lambda_consistency", 0.0))
+        w_mean = float(self.cfg.fm.lambda_mean)
+        w_imb = float(self.cfg.fm.lambda_imbalance)
+        w_cons = float(self.cfg.fm.lambda_consistency)
 
         imbalance_loss = self._imbalance_loss(x_pred) if w_imb > 0.0 else x.new_tensor(0.0)
 
@@ -190,11 +143,6 @@ class LoBiFlow(RectifiedFlowLOB):
             "imbalance": float(imbalance_loss.detach().cpu()),
             "consistency": float(consistency_loss.detach().cpu()),
             "consistency_steps": float(consistency_steps),
-            # keep legacy keys for downstream logging compatibility
-            "pair": 0.0,
-            "latent": 0.0,
-            "hidden": 0.0,
-            "prior": 0.0,
             "loss": float(total.detach().cpu()),
         }
         return total, logs
@@ -212,16 +160,10 @@ class LoBiFlow(RectifiedFlowLOB):
         state_dim = self.cfg.state_dim
         x = torch.randn(batch_size, state_dim, device=hist.device)
 
-        try:
-            default_steps = int(self.cfg.sample.steps)
-        except Exception:
-            default_steps = 32
+        default_steps = int(self.cfg.sample.steps)
         n_steps = int(max(1, default_steps if steps is None else steps))
 
-        try:
-            default_cfg_scale = float(self.cfg.sample.cfg_scale)
-        except Exception:
-            default_cfg_scale = 1.0
+        default_cfg_scale = float(self.cfg.sample.cfg_scale)
         guidance = float(default_cfg_scale if cfg_scale is None else cfg_scale)
 
         dt = 1.0 / float(n_steps)

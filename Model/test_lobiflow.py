@@ -159,22 +159,6 @@ def test_lobiflow_forward():
     out2 = model.sample(hist, cond=cond, steps=3)
     assert out2.shape == (B, D), f"Multi-step sample shape mismatch: got {out2.shape}"
 
-def test_lobiflow_legacy_mode():
-    """Test without FiLM or ResMLP to verify backward compatibility."""
-    from lob_baselines import LOBConfig
-    from lob_model import LoBiFlow
-    cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                     use_res_mlp=False, film_conditioning=False)
-    model = LoBiFlow(cfg)
-    B, H, D = 4, 20, cfg.state_dim
-    hist = torch.randn(B, H, D)
-    tgt = torch.randn(B, D)
-    cond = torch.randn(B, 7)
-    loss, logs = model.loss(tgt, hist, cond=cond)
-    assert loss.shape == ()
-    out = model.sample(hist, cond=cond, steps=1)
-    assert out.shape == (B, D)
-
 def test_biflow_forward():
     from lob_baselines import LOBConfig, BiFlowLOB
     cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64)
@@ -259,9 +243,9 @@ def test_consistency_loss():
     """Test that consistency loss computes correctly and is zero when disabled."""
     from lob_baselines import LOBConfig
     from lob_model import LoBiFlow
-    # With consistency enabled (must disable pair_regularizer so consistency path runs)
+    # With consistency enabled
     cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                     lambda_consistency=1.0, use_pair_regularizer=False)
+                     lambda_consistency=1.0)
     model = LoBiFlow(cfg)
     B, H, D = 4, 20, cfg.state_dim
     hist = torch.randn(B, H, D)
@@ -358,7 +342,6 @@ def main():
         ("feature_map_roundtrip", test_feature_map_roundtrip),
         ("model_construction", test_model_construction),
         ("lobiflow_forward", test_lobiflow_forward),
-        ("lobiflow_legacy_mode", test_lobiflow_legacy_mode),
         ("biflow_forward", test_biflow_forward),
         ("biflow_nf_forward", test_biflow_nf_forward),
         ("transformer_fu_net", test_transformer_fu_net),
