@@ -294,14 +294,6 @@ def generate_continuation(
 # -----------------------------
 # ICASSP metrics (raw + params)
 # -----------------------------
-def _flatten_dict(d: Dict[str, Any], prefix: str = "") -> Dict[str, float]:
-    return flatten_dict(d, prefix)
-
-
-def _unflatten_to_nested(flat_aggs: Dict[str, Dict[str, float]]) -> Dict[str, Any]:
-    return unflatten_to_nested(flat_aggs)
-
-
 def _safe_mean_std(vals):
     a = np.asarray(vals, dtype=np.float64)
     return {"mean": float(np.mean(a)), "std": float(np.std(a))}
@@ -589,7 +581,7 @@ def eval_one_window(
 
 
 def _aggregate_nested_dicts(dicts):
-    flat_rows = [_flatten_dict(d) for d in dicts]
+    flat_rows = [flatten_dict(d) for d in dicts]
     keys = sorted(set().union(*[set(fr.keys()) for fr in flat_rows]))
     aggs: Dict[str, Dict[str, float]] = {}
     for k in keys:
@@ -597,7 +589,7 @@ def _aggregate_nested_dicts(dicts):
         if not vals:
             continue
         aggs[k] = _safe_mean_std(vals)
-    return _unflatten_to_nested(aggs)
+    return unflatten_to_nested(aggs)
 
 
 @torch.no_grad()
@@ -820,7 +812,7 @@ def summarize_ablation_for_table(
     rows = []
     for name, payload in ablation_results.items():
         row = {"name": name}
-        flat = _flatten_dict(payload)
+        flat = flatten_dict(payload)
         for k in keys:
             if k in flat:
                 row[k] = flat[k]
