@@ -28,6 +28,7 @@ from typing import Any, Dict, List, Sequence
 import numpy as np
 
 from lob_baselines import LOBConfig
+from lob_utils import flatten_dict as _flatten
 from lob_datasets import (
     build_dataset_splits_from_fi2010,
     build_dataset_splits_from_npz_l2,
@@ -74,27 +75,20 @@ def _parse_str_list(s: str) -> List[str]:
     return [x.strip() for x in s.split(",") if x.strip()]
 
 
-from lob_utils import flatten_dict as _flatten
-
-
-def _safe_cfg_set(cfg: LOBConfig, key: str, val: Any):
-    try:
-        cfg.apply_overrides(**{key: val})
-    except Exception:
-        try:
-            setattr(cfg, key, val)
-        except Exception:
-            pass
+def _apply_cfg_overrides(cfg: LOBConfig, overrides: Dict[str, Any]) -> None:
+    """Apply flat overrides and fail fast for unknown keys."""
+    cleaned = {k: v for k, v in overrides.items() if v is not None}
+    if cleaned:
+        cfg.apply_overrides(**cleaned)
 
 
 def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
-    """Instantiate LOBConfig and apply common overrides safely."""
+    """Instantiate LOBConfig and apply CLI overrides."""
     cfg = LOBConfig()
 
     import torch as _torch
 
-    # Common overrides
-    overrides = {
+    common_overrides = {
         "device": _torch.device(args.device),
         "levels": args.levels,
         "history_len": args.history_len,
@@ -106,41 +100,22 @@ def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
         "use_cond_features": args.use_cond_features,
         "cond_standardize": args.cond_standardize,
     }
-    for k, v in overrides.items():
-        _safe_cfg_set(cfg, k, v)
+    _apply_cfg_overrides(cfg, common_overrides)
 
-    # Optional architecture / training knobs
-    if args.hidden_dim is not None:
-        _safe_cfg_set(cfg, "hidden_dim", args.hidden_dim)
-    if args.model_dim is not None:
-        _safe_cfg_set(cfg, "model_dim", args.model_dim)
-    if args.ctx_encoder is not None:
-        _safe_cfg_set(cfg, "ctx_encoder", args.ctx_encoder)
-    if hasattr(args, "film_conditioning"):
-        _safe_cfg_set(cfg, "film_conditioning", args.film_conditioning)
-    if hasattr(args, "lobiflow_profile") and args.lobiflow_profile is not None:
-        _safe_cfg_set(cfg, "lobiflow_profile", args.lobiflow_profile)
-
-    # Optional loss weights
-    if hasattr(args, "lambda_zcycle") and args.lambda_zcycle is not None:
-        _safe_cfg_set(cfg, "lambda_zcycle", args.lambda_zcycle)
-    if args.lambda_consistency is not None:
-        _safe_cfg_set(cfg, "lambda_consistency", args.lambda_consistency)
-    if args.lambda_imbalance is not None:
-        _safe_cfg_set(cfg, "lambda_imbalance", args.lambda_imbalance)
-
-    if hasattr(args, "use_minibatch_ot") and args.use_minibatch_ot:
-        _safe_cfg_set(cfg, "use_minibatch_ot", True)
-    if hasattr(args, "use_pair_regularizer"):
-        _safe_cfg_set(cfg, "use_pair_regularizer", args.use_pair_regularizer)
-    if hasattr(args, "cfg_scale") and args.cfg_scale is not None:
-        _safe_cfg_set(cfg, "cfg_scale", args.cfg_scale)
-
-    # Conditioning depths / vol window
-    if args.cond_depths:
-        _safe_cfg_set(cfg, "cond_depths", tuple(_parse_int_list(args.cond_depths)))
-    if args.cond_vol_window is not None:
-        _safe_cfg_set(cfg, "cond_vol_window", args.cond_vol_window)
+    optional_overrides = {
+        "hidden_dim": args.hidden_dim,
+        "ctx_encoder": args.ctx_encoder,
+        "film_conditioning": args.film_conditioning,
+        "lobiflow_profile": args.lobiflow_profile,
+        "lambda_consistency": args.lambda_consistency,
+        "lambda_imbalance": args.lambda_imbalance,
+        "use_minibatch_ot": args.use_minibatch_ot,
+        "use_pair_regularizer": args.use_pair_regularizer,
+        "cfg_scale": args.cfg_scale,
+        "cond_depths": tuple(_parse_int_list(args.cond_depths)) if args.cond_depths else None,
+        "cond_vol_window": args.cond_vol_window,
+    }
+    _apply_cfg_overrides(cfg, optional_overrides)
 
     return cfg
 
@@ -252,19 +227,11 @@ def run_icassp_suite(args: argparse.Namespace):
 
     cfg = _make_cfg_from_args(args)
 
-    # Persist config snapshot (best-effort)
-    cfg_dump = {}
-    for k in dir(cfg):
-        if k.startswith("_"):
-            continue
-        try:
-            v = getattr(cfg, k)
-            if callable(v):
-                continue
-            if isinstance(v, (int, float, str, bool, list, tuple, type(None))):
-                cfg_dump[k] = v
-        except Exception:
-            continue
+    # Persist config snapshot.
+    cfg_dump = {
+        "config": cfg.to_dict(),
+        "cli_args": vars(args),
+    }
     with open(os.path.join(out_root, "config_snapshot.json"), "w", encoding="utf-8") as f:
         json.dump(cfg_dump, f, indent=2)
 
@@ -282,6 +249,8 @@ def run_icassp_suite(args: argparse.Namespace):
         methods = ["lobiflow"]
 
     main_rows = []
+    rollout_horizons = _parse_int_list(args.rollout_horizons)
+    nfe_list = _parse_int_list(args.nfe_list)
     all_results_index: Dict[str, Any] = {
         "dataset": args.dataset,
         "methods": methods,
@@ -307,7 +276,7 @@ def run_icassp_suite(args: argparse.Namespace):
             nfe=args.eval_nfe,
             n_windows=args.eval_windows_val,
             seed=args.seed + 11,
-            horizons_eval=_parse_int_list(args.rollout_horizons),
+            horizons_eval=rollout_horizons,
         )
         res_A_test = eval_many_windows(
             ds_test, model, cfg,
@@ -315,7 +284,7 @@ def run_icassp_suite(args: argparse.Namespace):
             nfe=args.eval_nfe,
             n_windows=args.eval_windows_test,
             seed=args.seed + 17,
-            horizons_eval=_parse_int_list(args.rollout_horizons),
+            horizons_eval=rollout_horizons,
         )
         save_json(res_A_val, os.path.join(method_dir, "A_main_val.json"))
         save_json(res_A_test, os.path.join(method_dir, "A_main_test.json"))
@@ -323,7 +292,6 @@ def run_icassp_suite(args: argparse.Namespace):
 
         # B) Speed-quality sweep
         if args.run_B:
-            nfe_list = _parse_int_list(args.nfe_list)
             res_B = eval_speed_quality_nfe(
                 ds_test, model, cfg,
                 nfe_list=nfe_list,
@@ -345,10 +313,9 @@ def run_icassp_suite(args: argparse.Namespace):
 
         # D) Rollout stability
         if args.run_D:
-            horizons = _parse_int_list(args.rollout_horizons)
             res_D = eval_rollout_horizons(
                 ds_test, model, cfg,
-                horizons=horizons,
+                horizons=rollout_horizons,
                 nfe=args.eval_nfe,
                 n_windows=args.eval_windows_rollout,
                 seed=args.seed + 29,
@@ -492,33 +459,30 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--cond_depths", type=str, default="", help="e.g. 1,3,5,10")
     ap.add_argument("--cond_vol_window", type=int, default=None)
 
-    # Optional architecture overrides (safe if cfg ignores them)
+    # Optional architecture overrides
     ap.add_argument("--hidden_dim", type=int, default=None)
-    ap.add_argument("--model_dim", type=int, default=None)
     ap.add_argument("--ctx_encoder", type=str, default=None)
 
-    ap.add_argument("--film_conditioning", action="store_true", default=True)
+    ap.add_argument("--film_conditioning", action="store_true", default=None)
     ap.add_argument("--no-film_conditioning", dest="film_conditioning", action="store_false", help="Disable FiLM conditioning and use early concat instead")
 
     # Optional loss weights
-    ap.add_argument("--lambda_zcycle", type=float, default=None)
     ap.add_argument("--lambda_consistency", type=float, default=None)
     ap.add_argument("--lambda_imbalance", type=float, default=None)
 
     # New v2.1 Configs
-    ap.add_argument("--use_minibatch_ot", action="store_true", default=False, help="Enable Minibatch Optimal Transport Matching")
+    ap.add_argument("--use_minibatch_ot", action="store_true", default=None, help="Enable Minibatch Optimal Transport Matching")
     ap.add_argument("--cfg_scale", type=float, default=None, help="Classifier-Free Guidance Scale for inference")
-    
+
     ap.add_argument("--use_pair_regularizer", action="store_true", default=True)
     ap.add_argument("--no-pair_regularizer", dest="use_pair_regularizer", action="store_false", help="Disable the paired encoder loss in LoBiFlow")
 
-
     ap.add_argument(
-    "--lobiflow_profile",
-    type=str,
-    default="recommended",
-    choices=["legacy", "stage1", "stage2", "stage3", "stage4", "recommended"],
-)
+        "--lobiflow_profile",
+        type=str,
+        default="recommended",
+        choices=["legacy", "stage1", "stage2", "stage3", "stage4", "recommended"],
+    )
     # Training budget
     ap.add_argument("--steps", type=int, default=5000, help="Training steps for lobiflow/biflow")
     ap.add_argument("--steps_nf_stage1", type=int, default=5000)
