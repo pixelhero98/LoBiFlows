@@ -10,20 +10,6 @@ from .config import LOBConfig
 
 
 class LoBiFlow(RectifiedFlowLOB):
-    """LoBiFlow built on top of the RectifiedFlowLOB backbone.
-
-    What this keeps:
-    - RectifiedFlowLOB architecture and sampling geometry
-    - shared conditioning backbone
-    - cross-attention conditioning
-
-    What this enforces:
-    - multiscale context encoder
-
-    What this adds:
-    - imbalance loss
-    - optional consistency loss
-    """
 
     def __init__(self, cfg: LOBConfig):
         # Force the conditioning backbone to use multiscale context.
