@@ -1,188 +1,107 @@
-
 from __future__ import annotations
 
 from typing import Dict, Optional, Tuple
 
-import random
-
 import numpy as np
-import scipy.optimize
 import torch
-import torch.nn as nn
 import torch.nn.functional as F
 
-from lob_baselines import (
-    LOBConfig,
-    FiLMModulation,
-    CondEmbedder,
-    build_context_encoder,
-    CrossAttentionConditioner,
-    TransformerFUNet,
-    build_mlp,
-)
+try:
+    # Flat-folder / script usage
+    from lob_baselines import LOBConfig, RectifiedFlowLOB
+except Exception:
+    # Package usage
+    from .config import LOBConfig
+    from .baselines import RectifiedFlowLOB
 
 
-class LoBiFlow(nn.Module):
+class LoBiFlow(RectifiedFlowLOB):
+    """LoBiFlow built on top of the RectifiedFlowLOB backbone.
+
+    What this keeps:
+    - RectifiedFlowLOB architecture and sampling geometry
+    - shared conditioning backbone
+    - cross-attention conditioning
+
+    What this enforces:
+    - multiscale context encoder
+
+    What this adds:
+    - imbalance loss
+    - optional consistency loss
+    """
+
     def __init__(self, cfg: LOBConfig):
-        super().__init__()
-        self.cfg = cfg
-        D = cfg.state_dim
-        H = cfg.hidden_dim
-        use_res = getattr(cfg, "use_res_mlp", True)
-        use_film = getattr(cfg, "film_conditioning", True)
-        self.use_transformer = getattr(cfg, "fu_net_type", "mlp").lower() == "transformer"
+        # Force the conditioning backbone to use multiscale context.
+        try:
+            cfg.apply_overrides(ctx_encoder="multiscale")
+        except Exception:
+            try:
+                cfg.model.ctx_encoder = "multiscale"
+            except Exception:
+                pass
 
-        self.ctx_enc = build_context_encoder(cfg)
-        self.cond_emb = CondEmbedder(cfg)
-        self.cross = CrossAttentionConditioner(cfg)
-        self.x_proj = nn.Linear(D, H)
-        self.ctx_pool_proj = nn.Linear(H, H)
-        self.ctx_merge = nn.Sequential(nn.Linear(2 * H, H), nn.SiLU(), nn.LayerNorm(H))
+        super().__init__(cfg)
 
-        if self.use_transformer:
-            self.use_film = False
-            self.v_net = TransformerFUNet(cfg)
-        else:
-            self.use_film = use_film
-            if use_film:
-                self.film_t = FiLMModulation(H, H)
-                self.film_cond = FiLMModulation(H, H) if cfg.cond_dim > 0 else None
-                v_in = D + H
-            else:
-                self.film_cond = None
-                v_in = D + H + H + (H if cfg.cond_dim > 0 else 0)
-            self.v_net = build_mlp(v_in, H, D, dropout=cfg.dropout, use_res=use_res)
+        # Optional scaler compatibility hooks.
+        self.register_buffer("scaler_mu", torch.zeros(cfg.state_dim), persistent=False)
+        self.register_buffer("scaler_sigma", torch.ones(cfg.state_dim), persistent=False)
+        self.has_scaler = False
 
-        self.z_body = nn.Sequential(
-            nn.LayerNorm(H),
-            nn.Linear(H, H),
-            nn.SiLU(),
-            nn.Dropout(cfg.dropout),
-        )
-        self.z_mu = nn.Linear(H, D)
-        self.z_logvar = nn.Linear(H, D)
-        self.align_data = nn.Linear(H, H)
-        self.align_pred = nn.Linear(H, H)
-
-        self.register_buffer("scaler_mu", torch.zeros(D), persistent=False)
-        self.register_buffer("scaler_sigma", torch.ones(D), persistent=False)
-        self.has_scaler: bool = False
-
-    def set_scaler(self, mu: np.ndarray, sigma: np.ndarray):
-        mu_t = torch.from_numpy(mu.astype(np.float32))
-        sig_t = torch.from_numpy(sigma.astype(np.float32))
+    def set_scaler(self, mu: np.ndarray, sigma: np.ndarray) -> None:
+        mu_t = torch.as_tensor(mu, dtype=torch.float32, device=self.scaler_mu.device)
+        sigma_t = torch.as_tensor(sigma, dtype=torch.float32, device=self.scaler_sigma.device)
         if mu_t.numel() != self.scaler_mu.numel():
             raise ValueError("Scaler dimension mismatch.")
         self.scaler_mu.copy_(mu_t)
-        self.scaler_sigma.copy_(sig_t)
+        self.scaler_sigma.copy_(sigma_t)
         self.has_scaler = True
 
-    def _default_sample_steps(self) -> int:
-        return int(max(1, getattr(self.cfg, "sample_steps", 32)))
-
     def _consistency_steps(self) -> int:
-        choices = getattr(self.cfg, "consistency_step_choices", None)
-        if choices is not None:
-            if isinstance(choices, int):
-                return int(max(1, choices))
-            choices = [int(s) for s in choices if int(s) > 0]
-            if choices:
-                return random.choice(choices)
-        steps = getattr(self.cfg, "consistency_steps", None)
-        if steps is not None:
-            return int(max(1, steps))
-        return self._default_sample_steps()
-
-    def _maybe_drop_cond(self, c_e: Optional[torch.Tensor]) -> Optional[torch.Tensor]:
-        if c_e is None:
-            return None
-        p = float(getattr(self.cfg, "cfg_dropout", 0.0))
-        if (not self.training) or p <= 0.0:
-            return c_e
-        keep = (torch.rand(c_e.shape[0], 1, device=c_e.device) > p).float()
-        return c_e * keep
-
-    def _multiscale_ctx(self, ctx_tokens: torch.Tensor, cross_out: torch.Tensor) -> torch.Tensor:
-        avg_pool = self.ctx_pool_proj(ctx_tokens.mean(dim=1))
-        return self.ctx_merge(torch.cat([cross_out, avg_pool], dim=-1))
-
-    def _prep(
-        self,
-        hist: torch.Tensor,
-        x_ref: torch.Tensor,
-        t: torch.Tensor,
-        cond: Optional[torch.Tensor],
-        apply_cfg_dropout: bool = True,
-    ):
-        ctx_tokens, _ = self.ctx_enc(hist)
-        t_e = self.cond_emb.embed_t(t)
-        c_e = self.cond_emb.embed_cond(cond)
-        if apply_cfg_dropout:
-            c_e = self._maybe_drop_cond(c_e)
-        q = self.x_proj(x_ref) + t_e + (c_e if c_e is not None else 0.0)
-        cross_out = self.cross(q, ctx_tokens)
-        ctx = self._multiscale_ctx(ctx_tokens, cross_out)
-        return ctx_tokens, ctx, t_e, c_e
-
-    def _adaln_cond(self, t_e: torch.Tensor, c_e: Optional[torch.Tensor]) -> torch.Tensor:
-        return t_e + c_e if c_e is not None else t_e
-
-    def encode_latent(
-        self,
-        x: torch.Tensor,
-        hist: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-        sample: bool = True,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        t = torch.ones(x.shape[0], 1, device=x.device)
-        _, ctx, _, _ = self._prep(hist, x, t, cond, apply_cfg_dropout=False)
-        feat = self.z_body(ctx)
-        mu = self.z_mu(feat)
-        logvar = self.z_logvar(feat).clamp(-8.0, 8.0)
-        if sample:
-            eps = torch.randn_like(mu)
-            z = mu + torch.exp(0.5 * logvar) * eps
-        else:
-            z = mu
-        return z, mu, logvar, feat
-
-    def v_forward(
-        self,
-        x_t: torch.Tensor,
-        t: torch.Tensor,
-        hist: torch.Tensor,
-        cond: Optional[torch.Tensor] = None,
-    ) -> torch.Tensor:
-        ctx_tokens, ctx, t_e, c_e = self._prep(hist, x_t, t, cond, apply_cfg_dropout=True)
-
-        if self.use_transformer:
-            return self.v_net(x_t, ctx_tokens, self._adaln_cond(t_e, c_e))
-
-        if self.use_film:
-            ctx = self.film_t(ctx, t_e)
-            if self.film_cond is not None and c_e is not None:
-                ctx = self.film_cond(ctx, c_e)
-            return self.v_net(torch.cat([x_t, ctx], dim=-1))
-
-        parts = [x_t, ctx, t_e]
-        if c_e is not None:
-            parts.append(c_e)
-        return self.v_net(torch.cat(parts, dim=-1))
+        try:
+            return int(max(2, self.cfg.sample.steps))
+        except Exception:
+            return 32
 
     def _imbalance_loss(self, x: torch.Tensor) -> torch.Tensor:
-        L = self.cfg.levels
-        eps = self.cfg.eps
-        bid_p = x[:, 0:L]
-        bid_v = x[:, L:2 * L]
-        ask_p = x[:, 2 * L:3 * L]
-        ask_v = x[:, 3 * L:4 * L]
+        """Soft LOB validity constraints.
 
+        Assumes state layout:
+            [bid_p(L), bid_v(L), ask_p(L), ask_v(L)]
+        """
+        try:
+            levels = int(self.cfg.data.levels)
+        except Exception:
+            levels = int(self.cfg.levels)
+
+        try:
+            eps = float(self.cfg.train.eps)
+        except Exception:
+            eps = float(getattr(self.cfg, "eps", 1e-8))
+
+        bid_p = x[:, 0:levels]
+        bid_v = x[:, levels : 2 * levels]
+        ask_p = x[:, 2 * levels : 3 * levels]
+        ask_v = x[:, 3 * levels : 4 * levels]
+
+        # ask should be above bid
         spread_viol = F.relu(bid_p - ask_p + eps)
+
+        # bid prices should decrease with depth
         bid_mono = F.relu(bid_p[:, 1:] - bid_p[:, :-1] + eps)
+
+        # ask prices should increase with depth
         ask_mono = F.relu(ask_p[:, :-1] - ask_p[:, 1:] + eps)
+
+        # volumes should be non-negative
         vol_viol = F.relu(-bid_v) + F.relu(-ask_v)
 
-        return spread_viol.mean() + bid_mono.mean() + ask_mono.mean() + vol_viol.mean()
+        return (
+            spread_viol.mean()
+            + bid_mono.mean()
+            + ask_mono.mean()
+            + vol_viol.mean()
+        )
 
     def _consistency_loss(
         self,
@@ -193,33 +112,20 @@ class LoBiFlow(nn.Module):
         cond: Optional[torch.Tensor],
         steps: Optional[int] = None,
     ) -> torch.Tensor:
-        steps = int(max(1, steps if steps is not None else self._consistency_steps()))
+        """One-step vs two-step terminal prediction consistency."""
+        steps = int(max(2, self._consistency_steps() if steps is None else steps))
         dt = 1.0 / float(steps)
         t_next = torch.clamp(t + dt, max=1.0)
 
-        x_pred_1 = (x_t + (1 - t) * v_hat).detach()
+        # One-shot prediction to terminal point
+        x_pred_1 = (x_t + (1.0 - t) * v_hat).detach()
+
+        # Two-step prediction
         x_next = x_t + (t_next - t) * v_hat
         v_next = self.v_forward(x_next, t_next, hist, cond=cond)
-        x_pred_2 = x_next + (1 - t_next) * v_next
+        x_pred_2 = x_next + (1.0 - t_next) * v_next
+
         return F.mse_loss(x_pred_2, x_pred_1)
-
-    def _kl_prior_loss(self, mu: torch.Tensor, logvar: torch.Tensor) -> torch.Tensor:
-        return 0.5 * (mu.pow(2) + logvar.exp() - 1.0 - logvar).mean()
-
-    def _pair_loss(
-        self,
-        x_pred: torch.Tensor,
-        hist: torch.Tensor,
-        cond: Optional[torch.Tensor],
-        mu_target: torch.Tensor,
-        feat_target: torch.Tensor,
-    ) -> Tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        _, mu_pred, _, feat_pred = self.encode_latent(x_pred, hist, cond=cond, sample=False)
-        latent_loss = F.mse_loss(mu_pred, mu_target.detach())
-        hidden_loss = F.mse_loss(self.align_pred(feat_pred), self.align_data(feat_target.detach()))
-        align_w = float(getattr(self.cfg, "pair_align_weight", 0.25))
-        pair_loss = latent_loss + align_w * hidden_loss
-        return pair_loss, latent_loss, hidden_loss
 
     def loss(
         self,
@@ -228,84 +134,70 @@ class LoBiFlow(nn.Module):
         fut: Optional[torch.Tensor] = None,
         cond: Optional[torch.Tensor] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        B = x.shape[0]
-        D = self.cfg.state_dim
+        del fut
 
-        use_paired_encoder = bool(getattr(self.cfg, "use_paired_encoder", True))
-        pair_regularizer = bool(getattr(self.cfg, "use_pair_regularizer", use_paired_encoder))
+        batch_size = x.shape[0]
 
-        prior_loss = torch.tensor(0.0, device=x.device)
-        pair_loss = torch.tensor(0.0, device=x.device)
-        latent_loss = torch.tensor(0.0, device=x.device)
-        hidden_loss = torch.tensor(0.0, device=x.device)
-
-        if use_paired_encoder:
-            z, mu, logvar, feat_x = self.encode_latent(x, hist, cond=cond, sample=self.training)
-            prior_loss = self._kl_prior_loss(mu, logvar)
-        else:
-            z = torch.randn(B, D, device=x.device)
-            feat_x = torch.empty(B, 0, device=x.device)
-            mu = z
-            logvar = torch.zeros_like(z)
-            use_ot = getattr(self.cfg, "use_minibatch_ot", True)
-            if use_ot and B > 1:
-                with torch.no_grad():
-                    dist_mat = torch.cdist(x, z, p=2.0) ** 2
-                    _, col_ind = scipy.optimize.linear_sum_assignment(dist_mat.cpu().numpy())
-                    z = z[col_ind]
-                    mu = mu[col_ind]
-                    logvar = logvar[col_ind]
-
-        t = torch.rand(B, 1, device=x.device)
-        x_t = (1 - t) * z + t * x
-
+        # Standard rectified-flow geometry
+        z = torch.randn_like(x)
+        t = torch.rand(batch_size, 1, device=x.device)
+        x_t = (1.0 - t) * z + t * x
         v_target = x - z
+
         v_hat = self.v_forward(x_t, t, hist, cond=cond)
         mean_loss = F.mse_loss(v_hat, v_target)
-        x_pred = x_t + (1 - t) * v_hat
 
-        w_imb = float(getattr(self.cfg, "lambda_imbalance", 0.0))
-        imbalance_loss = torch.tensor(0.0, device=x.device)
-        if w_imb > 0.0:
-            imbalance_loss = self._imbalance_loss(x_pred)
+        x_pred = x_t + (1.0 - t) * v_hat
 
-        if use_paired_encoder and pair_regularizer:
-            pair_loss, latent_loss, hidden_loss = self._pair_loss(x_pred, hist, cond, mu, feat_x)
+        try:
+            w_mean = float(self.cfg.fm.lambda_mean)
+        except Exception:
+            w_mean = float(getattr(self.cfg, "lambda_mean", 1.0))
 
-        use_consistency = (not pair_regularizer) and float(getattr(self.cfg, "lambda_consistency", 0.0)) > 0.0
-        consistency_loss = torch.tensor(0.0, device=x.device)
+        try:
+            w_imb = float(self.cfg.fm.lambda_imbalance)
+        except Exception:
+            w_imb = float(getattr(self.cfg, "lambda_imbalance", 0.0))
+
+        try:
+            w_cons = float(self.cfg.fm.lambda_consistency)
+        except Exception:
+            w_cons = float(getattr(self.cfg, "lambda_consistency", 0.0))
+
+        imbalance_loss = self._imbalance_loss(x_pred) if w_imb > 0.0 else x.new_tensor(0.0)
+
+        consistency_loss = x.new_tensor(0.0)
         consistency_steps = 0
-        if use_consistency:
+        if w_cons > 0.0:
             consistency_steps = self._consistency_steps()
-            consistency_loss = self._consistency_loss(x_t, t, v_hat, hist, cond, steps=consistency_steps)
+            consistency_loss = self._consistency_loss(
+                x_t=x_t,
+                t=t,
+                v_hat=v_hat,
+                hist=hist,
+                cond=cond,
+                steps=consistency_steps,
+            )
 
-        w_fm = float(getattr(self.cfg, "lambda_mean", 1.0))
-        w_pair = float(getattr(self.cfg, "lambda_pair", 0.25))
-        w_prior = float(getattr(self.cfg, "lambda_prior", 1e-3)) if use_paired_encoder else 0.0
-        w_consistency = float(getattr(self.cfg, "lambda_consistency", 0.0)) if use_consistency else 0.0
-
-        loss = (
-            w_fm * mean_loss
-            + w_pair * pair_loss
-            + w_prior * prior_loss
-            + w_consistency * consistency_loss
+        total = (
+            w_mean * mean_loss
             + w_imb * imbalance_loss
+            + w_cons * consistency_loss
         )
 
         logs = {
             "mean": float(mean_loss.detach().cpu()),
-            "pair": float(pair_loss.detach().cpu()),
-            "latent": float(latent_loss.detach().cpu()),
-            "hidden": float(hidden_loss.detach().cpu()),
-            "prior": float(prior_loss.detach().cpu()),
-            "consistency": float(consistency_loss.detach().cpu()),
             "imbalance": float(imbalance_loss.detach().cpu()),
+            "consistency": float(consistency_loss.detach().cpu()),
             "consistency_steps": float(consistency_steps),
-            "paired_encoder": float(use_paired_encoder),
-            "pair_regularizer": float(pair_regularizer),
-            "loss": float(loss.detach().cpu()),
+            # keep legacy keys for downstream logging compatibility
+            "pair": 0.0,
+            "latent": 0.0,
+            "hidden": 0.0,
+            "prior": 0.0,
+            "loss": float(total.detach().cpu()),
         }
-        return loss, logs
+        return total, logs
 
     @torch.no_grad()
     def sample(
@@ -313,23 +205,39 @@ class LoBiFlow(nn.Module):
         hist: torch.Tensor,
         cond: Optional[torch.Tensor] = None,
         steps: Optional[int] = None,
-        cfg_scale: float = 1.0,
+        cfg_scale: Optional[float] = None,
     ) -> torch.Tensor:
-        B = hist.shape[0]
-        D = self.cfg.state_dim
-        x = torch.randn(B, D, device=hist.device)
+        """Euler sampler with optional classifier-free guidance."""
+        batch_size = hist.shape[0]
+        state_dim = self.cfg.state_dim
+        x = torch.randn(batch_size, state_dim, device=hist.device)
 
-        steps = self._default_sample_steps() if steps is None else int(max(1, steps))
-        dt = 1.0 / float(steps)
-        for i in range(steps):
-            t = torch.full((B, 1), float(i) / float(steps), device=hist.device)
-            if cfg_scale == 1.0 or cond is None:
+        try:
+            default_steps = int(self.cfg.sample.steps)
+        except Exception:
+            default_steps = 32
+        n_steps = int(max(1, default_steps if steps is None else steps))
+
+        try:
+            default_cfg_scale = float(self.cfg.sample.cfg_scale)
+        except Exception:
+            default_cfg_scale = 1.0
+        guidance = float(default_cfg_scale if cfg_scale is None else cfg_scale)
+
+        dt = 1.0 / float(n_steps)
+
+        for i in range(n_steps):
+            t = torch.full((batch_size, 1), float(i) / float(n_steps), device=hist.device)
+
+            if guidance == 1.0 or cond is None:
                 v = self.v_forward(x, t, hist, cond=cond)
             else:
                 v_cond = self.v_forward(x, t, hist, cond=cond)
                 v_uncond = self.v_forward(x, t, hist, cond=None)
-                v = v_uncond + cfg_scale * (v_cond - v_uncond)
+                v = v_uncond + guidance * (v_cond - v_uncond)
+
             x = x + dt * v
+
         return x
 
 

@@ -79,17 +79,21 @@ from lob_utils import flatten_dict as _flatten
 
 def _safe_cfg_set(cfg: LOBConfig, key: str, val: Any):
     try:
-        setattr(cfg, key, val)
+        cfg.apply_overrides(**{key: val})
     except Exception:
-        pass
+        try:
+            setattr(cfg, key, val)
+        except Exception:
+            pass
 
 
 def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
     """Instantiate LOBConfig and apply common overrides safely."""
     cfg = LOBConfig()
 
-    # Common overrides (only applied if field exists)
     import torch as _torch
+
+    # Common overrides
     overrides = {
         "device": _torch.device(args.device),
         "levels": args.levels,
@@ -105,28 +109,34 @@ def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
     for k, v in overrides.items():
         _safe_cfg_set(cfg, k, v)
 
-    # Optional architecture/training knobs (safe no-op if not in config)
+    # Optional architecture / training knobs
     if args.hidden_dim is not None:
         _safe_cfg_set(cfg, "hidden_dim", args.hidden_dim)
     if args.model_dim is not None:
         _safe_cfg_set(cfg, "model_dim", args.model_dim)
     if args.ctx_encoder is not None:
         _safe_cfg_set(cfg, "ctx_encoder", args.ctx_encoder)
+    if hasattr(args, "film_conditioning"):
+        _safe_cfg_set(cfg, "film_conditioning", args.film_conditioning)
+    if hasattr(args, "lobiflow_profile") and args.lobiflow_profile is not None:
+        _safe_cfg_set(cfg, "lobiflow_profile", args.lobiflow_profile)
 
     # Optional loss weights
-    if args.lambda_zcycle is not None:
-        cfg.lambda_zcycle = args.lambda_zcycle
+    if hasattr(args, "lambda_zcycle") and args.lambda_zcycle is not None:
+        _safe_cfg_set(cfg, "lambda_zcycle", args.lambda_zcycle)
     if args.lambda_consistency is not None:
-        cfg.lambda_consistency = args.lambda_consistency
+        _safe_cfg_set(cfg, "lambda_consistency", args.lambda_consistency)
     if args.lambda_imbalance is not None:
-        cfg.lambda_imbalance = args.lambda_imbalance
-        
-    if hasattr(args, "use_minibatch_ot") and args.use_minibatch_ot:
-        cfg.use_minibatch_ot = True
-    if hasattr(args, "cfg_scale") and args.cfg_scale is not None:
-        cfg.cfg_scale = args.cfg_scale
+        _safe_cfg_set(cfg, "lambda_imbalance", args.lambda_imbalance)
 
-    # Conditioning depths / vol window if present
+    if hasattr(args, "use_minibatch_ot") and args.use_minibatch_ot:
+        _safe_cfg_set(cfg, "use_minibatch_ot", True)
+    if hasattr(args, "use_pair_regularizer"):
+        _safe_cfg_set(cfg, "use_pair_regularizer", args.use_pair_regularizer)
+    if hasattr(args, "cfg_scale") and args.cfg_scale is not None:
+        _safe_cfg_set(cfg, "cfg_scale", args.cfg_scale)
+
+    # Conditioning depths / vol window
     if args.cond_depths:
         _safe_cfg_set(cfg, "cond_depths", tuple(_parse_int_list(args.cond_depths)))
     if args.cond_vol_window is not None:
@@ -487,6 +497,9 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--model_dim", type=int, default=None)
     ap.add_argument("--ctx_encoder", type=str, default=None)
 
+    ap.add_argument("--film_conditioning", action="store_true", default=True)
+    ap.add_argument("--no-film_conditioning", dest="film_conditioning", action="store_false", help="Disable FiLM conditioning and use early concat instead")
+
     # Optional loss weights
     ap.add_argument("--lambda_zcycle", type=float, default=None)
     ap.add_argument("--lambda_consistency", type=float, default=None)
@@ -495,7 +508,17 @@ def build_argparser() -> argparse.ArgumentParser:
     # New v2.1 Configs
     ap.add_argument("--use_minibatch_ot", action="store_true", default=False, help="Enable Minibatch Optimal Transport Matching")
     ap.add_argument("--cfg_scale", type=float, default=None, help="Classifier-Free Guidance Scale for inference")
+    
+    ap.add_argument("--use_pair_regularizer", action="store_true", default=True)
+    ap.add_argument("--no-pair_regularizer", dest="use_pair_regularizer", action="store_false", help="Disable the paired encoder loss in LoBiFlow")
 
+
+    ap.add_argument(
+    "--lobiflow_profile",
+    type=str,
+    default="recommended",
+    choices=["legacy", "stage1", "stage2", "stage3", "stage4", "recommended"],
+)
     # Training budget
     ap.add_argument("--steps", type=int, default=5000, help="Training steps for lobiflow/biflow")
     ap.add_argument("--steps_nf_stage1", type=int, default=5000)

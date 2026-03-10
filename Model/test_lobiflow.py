@@ -259,9 +259,9 @@ def test_consistency_loss():
     """Test that consistency loss computes correctly and is zero when disabled."""
     from lob_baselines import LOBConfig
     from lob_model import LoBiFlow
-    # With consistency enabled
+    # With consistency enabled (must disable pair_regularizer so consistency path runs)
     cfg = LOBConfig(levels=5, history_len=20, cond_dim=7, hidden_dim=64,
-                     lambda_consistency=1.0)
+                     lambda_consistency=1.0, use_pair_regularizer=False)
     model = LoBiFlow(cfg)
     B, H, D = 4, 20, cfg.state_dim
     hist = torch.randn(B, H, D)
