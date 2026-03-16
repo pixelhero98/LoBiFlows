@@ -1,0 +1,104 @@
+{
+  "datasets": [
+    "synthetic",
+    "optiver",
+    "cryptos",
+    "es_mbp_10"
+  ],
+  "sections": [
+    "architecture",
+    "quality",
+    "speed"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "quality_presets": {
+    "synthetic": {
+      "levels": 10,
+      "history_len": 128,
+      "eval_nfe": 2,
+      "solver": "euler",
+      "ctx_encoder": "transformer",
+      "ctx_causal": true,
+      "ctx_local_kernel": 5,
+      "ctx_pool_scales": "4,16"
+    },
+    "optiver": {
+      "levels": 2,
+      "history_len": 128,
+      "eval_nfe": 4,
+      "solver": "dpmpp2m",
+      "ctx_encoder": "transformer",
+      "ctx_causal": true,
+      "ctx_local_kernel": 5,
+      "ctx_pool_scales": "4,16"
+    },
+    "cryptos": {
+      "levels": 10,
+      "history_len": 256,
+      "eval_nfe": 2,
+      "solver": "dpmpp2m",
+      "ctx_encoder": "hybrid",
+      "ctx_causal": true,
+      "ctx_local_kernel": 7,
+      "ctx_pool_scales": "8,32"
+    },
+    "es_mbp_10": {
+      "levels": 10,
+      "history_len": 256,
+      "eval_nfe": 1,
+      "solver": "euler",
+      "ctx_encoder": "hybrid",
+      "ctx_causal": true,
+      "ctx_local_kernel": 7,
+      "ctx_pool_scales": "8,32"
+    }
+  },
+  "speed_presets": {
+    "synthetic": {
+      "levels": 10,
+      "history_len": 128,
+      "eval_nfe": 1,
+      "solver": "euler",
+      "ctx_encoder": "transformer",
+      "ctx_causal": true,
+      "ctx_local_kernel": 5,
+      "ctx_pool_scales": "4,16"
+    },
+    "optiver": {
+      "levels": 2,
+      "history_len": 128,
+      "eval_nfe": 1,
+      "solver": "dpmpp2m",
+      "ctx_encoder": "transformer",
+      "ctx_causal": true,
+      "ctx_local_kernel": 5,
+      "ctx_pool_scales": "4,16"
+    },
+    "cryptos": {
+      "levels": 10,
+      "history_len": 256,
+      "eval_nfe": 1,
+      "solver": "dpmpp2m",
+      "ctx_encoder": "hybrid",
+      "ctx_causal": true,
+      "ctx_local_kernel": 7,
+      "ctx_pool_scales": "8,32"
+    },
+    "es_mbp_10": {
+      "levels": 10,
+      "history_len": 256,
+      "eval_nfe": 1,
+      "solver": "euler",
+      "ctx_encoder": "hybrid",
+      "ctx_causal": true,
+      "ctx_local_kernel": 7,
+      "ctx_pool_scales": "8,32"
+    }
+  }
+}
