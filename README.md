@@ -43,17 +43,17 @@ ranking.
 
 ## Main Scripts
 
-- `Model/experiments_lobiflow.py`: main LoBiFlow runner
-- `Model/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
-- `Model/export_model_metric_catalogs.py`: flat metric catalog export
-- `Model/test_lobiflow.py`: smoke and regression suite
+- `scripts/experiments_lobiflow.py`: main LoBiFlow runner
+- `scripts/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
+- `scripts/export_model_metric_catalogs.py`: flat metric catalog export
+- `scripts/test_lobiflow.py`: smoke and regression suite
 
 ## Usage
 
 Run the main LoBiFlow suite with dataset-specific defaults:
 
 ```bash
-cd Model
+cd scripts
 python experiments_lobiflow.py --dataset synthetic --out_dir results_synth
 python experiments_lobiflow.py --dataset optiver --out_dir results_optiver
 python experiments_lobiflow.py --dataset cryptos --out_dir results_cryptos
@@ -63,21 +63,21 @@ python experiments_lobiflow.py --dataset es_mbp_10 --out_dir results_es
 Run the faster `NFE=1` speed variant:
 
 ```bash
-cd Model
+cd scripts
 python experiments_lobiflow.py --dataset cryptos --lobiflow_variant speed --out_dir results_cryptos_speed
 ```
 
 Run the paper-ready benchmark bundle:
 
 ```bash
-cd Model
+cd scripts
 python benchmark_lobiflow_paper_ready.py
 ```
 
 Export flat CSV/JSON metric catalogs:
 
 ```bash
-cd Model
+cd scripts
 python export_model_metric_catalogs.py
 ```
 
@@ -94,7 +94,7 @@ LoBiFlow applies dataset presets first, then CLI overrides. The main knobs are:
 Typical examples:
 
 ```bash
-cd Model
+cd scripts
 python experiments_lobiflow.py --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
 python experiments_lobiflow.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
 python experiments_lobiflow.py --dataset synthetic --synthetic_length 5000000 --steps 20000
@@ -109,15 +109,10 @@ Current quality presets:
 
 ## Final Outputs
 
-In the source repo, paper-ready benchmark outputs are written under:
+Paper-ready benchmark outputs are written under:
 
-- `Model/results_benchmark_lobiflow_paper_ready_20260315`
-- `Model/results_model_metric_catalogs_20260316`
-
-In the packaged local bundle (`LoBiFlow_paper_ready`), the copied outputs are under:
-
-- `results/results_benchmark_lobiflow_paper_ready_20260315`
-- `results/results_model_metric_catalogs_20260316`
+- `scripts/results_benchmark_lobiflow_paper_ready_20260315`
+- `scripts/results_model_metric_catalogs_20260316`
 
 The flat CSVs in `results_model_metric_catalogs_20260316` are the easiest entry
 point for comparing LoBiFlow against all baselines.

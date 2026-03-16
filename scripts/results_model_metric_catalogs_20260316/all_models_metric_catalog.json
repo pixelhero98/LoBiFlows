@@ -1,0 +1,4322 @@
+[
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.3710982948879725,
+    "std": 0.010469275584888346,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.42697591843305566,
+    "std": 0.01634208664974437,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.3994431502727846,
+    "std": 0.01654451581684205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.250114294996695,
+    "std": 0.010116619970976714,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.3358130878082187,
+    "std": 0.016167145502120114,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.4249267578125,
+    "std": 0.02540902451932937,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 28.410487396280608,
+    "std": 8.426230391117446,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 109.41611229785072,
+    "std": 33.45705894130863,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3654274656908734,
+    "std": 0.1369488151254359,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.24159008311525448,
+    "std": 0.021519671052429704,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 3.0182059945676967,
+    "std": 0.9294089269948062,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2547.4610484386276,
+    "std": 61.512835141501874,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.35950107278039833,
+    "std": 0.011799550000731617,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.30193906576859086,
+    "std": 0.027639738900074876,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.14215794015915267,
+    "std": 0.018409915125893708,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.20815124141282002,
+    "std": 0.013348614066073503,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.5076469150383496,
+    "std": 0.01775325474930386,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.4519212962962963,
+    "std": 0.0195736174567435,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 2.6867482189648095,
+    "std": 1.136153839407262,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 5.134624981286153,
+    "std": 3.942511786583811,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.791745877434326,
+    "std": 0.11946746618176322,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.216205180591102,
+    "std": 0.009700784706494632,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 3.95416751875308,
+    "std": 1.1570185536078064,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 769.6351519236083,
+    "std": 1.6063245539466953,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 1.8299895204943186,
+    "std": 0.10702196093390917,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.15963983445701396,
+    "std": 0.012204307066216889,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.49986247465388856,
+    "std": 6.627768202517516e-05,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 63.002808093996144,
+    "std": 25.98176916707282,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 60.92265893529735,
+    "std": 25.40830183812129,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 1.2843444444444443,
+    "std": 0.12181420129233017,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 1627.2339403651854,
+    "std": 1254.7812365493908,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 2056.0104678045545,
+    "std": 593.1417030752191,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 3.612035340811155,
+    "std": 0.6152696087755126,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.13840735702133214,
+    "std": 0.005135700345772313,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 4532.193402766025,
+    "std": 4364.67673509911,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 5245.40653865086,
+    "std": 20.769946632111136,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.4568847584038001,
+    "std": 0.010492179720371302,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.3377140891779877,
+    "std": 0.023277323132966564,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.49453261806142174,
+    "std": 0.006309339868114259,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.37644851171857174,
+    "std": 0.014546573794070051,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.4223079220649453,
+    "std": 0.025988836533289445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.9710944444444444,
+    "std": 0.04214563855380965,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 11.849423082056042,
+    "std": 14.04743271367897,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 43.48474802231586,
+    "std": 56.221477033496136,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.2019643495406829,
+    "std": 0.10598351899490698,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14346458504153747,
+    "std": 0.004942924028531126,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 1.5963141879198015,
+    "std": 0.38578931831102314,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2516.2745132045043,
+    "std": 43.603073666166644,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.4050212868518933,
+    "std": 0.01405848243345956,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.4172945575081812,
+    "std": 0.01767583174073932,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.45546217411486956,
+    "std": 0.012725886430400634,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.29705072112870556,
+    "std": 0.029928157147895665,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.38420448792208745,
+    "std": 0.0454198747860373,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 0.5001519097222222,
+    "std": 0.041193224177111215,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 140.4303698315524,
+    "std": 105.291077287165,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 555.4890813511954,
+    "std": 420.5741167890928,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3384071606369907,
+    "std": 0.07253818902537461,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.24616450037124732,
+    "std": 0.007743763105521046,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 5.030597293802078,
+    "std": 4.266115954389281,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 1279.0904228853633,
+    "std": 31.074144091662664,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.41303458525138514,
+    "std": 0.010144929233172914,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.301798538983292,
+    "std": 0.021001525497552614,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.286333688428072,
+    "std": 0.016918218436268895,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.33600919952267455,
+    "std": 0.021878161938996065,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.461327107911962,
+    "std": 0.020036946583351922,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 0.5994212962962964,
+    "std": 0.032099479529687336,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 1.5079451770078591,
+    "std": 0.23214142420057746,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 1.809644203198199,
+    "std": 0.5254013035528259,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.404353398927006,
+    "std": 0.14729108986289857,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.21580148238160407,
+    "std": 0.013244279995306881,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 2.5556168241973514,
+    "std": 0.6483506212422241,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 193.13621146268108,
+    "std": 0.7126262516000861,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 1.7140710280268312,
+    "std": 0.1880186886238264,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.19432436680408952,
+    "std": 0.029253604082541247,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.4989174389783767,
+    "std": 0.0005651091679843641,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 34.67956782234931,
+    "std": 35.8871598000206,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 33.44958793592859,
+    "std": 33.863804600409445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 1.4566537037037037,
+    "std": 0.06508320584549895,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 2983.2664445765727,
+    "std": 2225.3797252353947,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 3019.528256459147,
+    "std": 1921.138447045013,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 4.449904588691197,
+    "std": 1.2589662209408328,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1434529881698999,
+    "std": 0.016663905676871205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 11061.656632802202,
+    "std": 5936.251641879544,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2614.83636872222,
+    "std": 34.396696762207554,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.45886721087318316,
+    "std": 0.008335107293870098,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.3265461673625064,
+    "std": 0.012190090355790533,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.49730512790600273,
+    "std": 0.001345934057165649,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.3765803461455362,
+    "std": 0.024311729459043672,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.4140685492416238,
+    "std": 0.020145596550709015,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 1.0011648148148147,
+    "std": 0.05537617782005948,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 37.80164353201993,
+    "std": 73.43211436524244,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 147.6605367554007,
+    "std": 293.7984037965992,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.165672657542863,
+    "std": 0.1030082882703116,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14668819813474093,
+    "std": 0.004701743559443437,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 1.2803355589748853,
+    "std": 0.18356510537549908,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2518.5714864692027,
+    "std": 42.248354391070094,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.3706572402373188,
+    "std": 0.005665551417870419,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.4288165948594956,
+    "std": 0.013091806425370715,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.40477539154804365,
+    "std": 0.0070716250171362965,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.23804936950497485,
+    "std": 0.02157336871051098,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.34210192186372895,
+    "std": 0.014887358462152344,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 0.41728244357638894,
+    "std": 0.027412221981379777,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 97.59736662783936,
+    "std": 120.79265776876646,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 386.0450793689608,
+    "std": 483.11947179860925,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.4231403808392666,
+    "std": 0.07320198551818019,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.25915399979349235,
+    "std": 0.012152191441831826,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 2.318285953709989,
+    "std": 0.8110674378902363,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2544.0755385488346,
+    "std": 60.68114647950128,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.3734457774932093,
+    "std": 0.020957551350440223,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.42893254083966126,
+    "std": 0.01455431490590493,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.40601430643557607,
+    "std": 0.01736284703008831,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.2508003863832053,
+    "std": 0.048349619129157764,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.3433900770164032,
+    "std": 0.04255723180519029,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 0.4497395833333333,
+    "std": 0.08276077403802345,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 179.3149273828075,
+    "std": 169.54440471270536,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 712.8527647284143,
+    "std": 677.804012428118,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3537530590376712,
+    "std": 0.09822507443475771,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.2613689129360973,
+    "std": 0.011736379023099265,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 1.652233331202737,
+    "std": 0.045574760087833045,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2679.3506454278636,
+    "std": 75.7155135611272,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.3626552611739337,
+    "std": 0.00755846836622446,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.30619394947228956,
+    "std": 0.017780185961421596,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.16033599576840907,
+    "std": 0.010982902662622763,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.22447599874157503,
+    "std": 0.018042745146447874,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.4846108981449316,
+    "std": 0.02140082802037109,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 0.4428009259259259,
+    "std": 0.026047005625553447,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 2.6809384620526466,
+    "std": 1.0467619022406687,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 4.750939849467784,
+    "std": 3.3880513879546483,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.7345467833059884,
+    "std": 0.06439789470208988,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22225582367428345,
+    "std": 0.010353986375272642,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 3.916600344709644,
+    "std": 1.104252009236424,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 768.3489604665535,
+    "std": 1.4961119606053517,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.3612776580475511,
+    "std": 0.007535604797831531,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2920772988200217,
+    "std": 0.007663853150195665,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.13595672319253846,
+    "std": 0.0134733410126782,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.21920867155686427,
+    "std": 0.0147553301794981,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.49852275045514316,
+    "std": 0.02366576469330433,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 0.458611111111111,
+    "std": 0.03053473266354267,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 1.9324383130629954,
+    "std": 0.4822843991714561,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 2.6829113639243127,
+    "std": 1.3049567272981046,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.6328692885229636,
+    "std": 0.12871495931273585,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22205754152819085,
+    "std": 0.009141565562841104,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 3.8404773468383104,
+    "std": 1.001588826398407,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 812.8055905208587,
+    "std": 4.127694427271591,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 2.1224671206521686,
+    "std": 0.4804468872462573,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.1730861511806594,
+    "std": 0.015576791149142519,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.4999566683969488,
+    "std": 3.47145999878413e-05,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 80.99564343537482,
+    "std": 43.46168828753987,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 79.51616738822774,
+    "std": 42.72269470136583,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 1.436325925925926,
+    "std": 0.05027270501658431,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 3184.2776492846397,
+    "std": 2170.4279571300167,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 2793.622174404008,
+    "std": 752.2702914622511,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 3.8329599842750297,
+    "std": 0.6085626183457142,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14140760214802217,
+    "std": 0.013355162098377586,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 6378.676302036765,
+    "std": 4314.878706066797,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 4901.6040180910695,
+    "std": 56.08847161849706,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 1.4974381937580394,
+    "std": 0.1429160200753879,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.17963951050795568,
+    "std": 0.028757976522179388,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.4996392337627443,
+    "std": 0.0003545593226543055,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 13.468144014430106,
+    "std": 10.2154225027114,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 13.126895570973591,
+    "std": 9.661123589280928,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 1.255601851851852,
+    "std": 0.1319341902448171,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 1379.4413108811561,
+    "std": 773.8315989115845,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 1976.4825182605389,
+    "std": 631.0545338555543,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 3.5413131723528743,
+    "std": 0.25792023473967796,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14348650769186247,
+    "std": 0.007419953227604252,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 3204.1717977782646,
+    "std": 2211.998140883923,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 5184.435773719645,
+    "std": 72.15950272737354,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.48261778019931184,
+    "std": 0.011761810368319884,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2957746327911214,
+    "std": 0.016796672354922507,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.4975477285523174,
+    "std": 0.000922114040953138,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.4251886040004006,
+    "std": 0.023676099522071812,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.45928150452991046,
+    "std": 0.023069944196988445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 1.0467444444444445,
+    "std": 0.05226561062015778,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 30.326054087380196,
+    "std": 49.432956207743004,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 116.50765583659556,
+    "std": 197.60146469162834,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.1916242660370826,
+    "std": 0.10057216532223205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.17273309998990727,
+    "std": 0.008225023804236497,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 2.5930750040343105,
+    "std": 0.9071425343441801,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2375.529996816767,
+    "std": 65.97918672156196,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.45998187661368367,
+    "std": 0.006235478970635715,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.334666861216288,
+    "std": 0.018988123717495285,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.4959818627805486,
+    "std": 0.0026144725636843627,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.3858996514352616,
+    "std": 0.014914789917881501,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.42306032453645714,
+    "std": 0.014071720429537303,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 1.0633259259259258,
+    "std": 0.048634435462511554,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 13.395206706011654,
+    "std": 24.658437343918525,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 50.00921986696241,
+    "std": 98.54150139085064,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.1847773352912498,
+    "std": 0.04225942695196881,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1466166466069467,
+    "std": 0.0043032539797712025,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 2.118393354543571,
+    "std": 1.244445147144741,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2491.143170039868,
+    "std": 52.13788146312719,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "score_main",
+    "mean": 0.6102085078916614,
+    "std": 0.03209324363023391,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2920737294927801,
+    "std": 0.029193840820998677,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "disc_auc_gap",
+    "mean": 0.4994386853411285,
+    "std": 0.0005222878612272447,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "unconditional_w1",
+    "mean": 0.7281215660211886,
+    "std": 0.15650781816225215,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "conditional_w1",
+    "mean": 1.0018759827389094,
+    "std": 0.13093715821806312,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "u_l1",
+    "mean": 0.8150716145833332,
+    "std": 0.07604812592701228,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "c_l1",
+    "mean": 3107.4623421184456,
+    "std": 580.4246099421835,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "spread_specific_error",
+    "mean": 12317.98661053002,
+    "std": 2304.2806793774657,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "imbalance_specific_error",
+    "mean": 3.183298619535201,
+    "std": 0.09557298741778138,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.24801769066562987,
+    "std": 0.023417608151521038,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "impact_response_error",
+    "mean": 20.338370580857934,
+    "std": 3.542669691821172,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "trades",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 754.5930652162901,
+    "std": 2.298885977346195,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "score_main",
+    "mean": 0.44104075285685723,
+    "std": 0.018497508981681485,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "tstr_macro_f1",
+    "mean": 0.27919189597659416,
+    "std": 0.017337988957784867,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "disc_auc_gap",
+    "mean": 0.17112397520463724,
+    "std": 0.0289671484159118,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "unconditional_w1",
+    "mean": 0.3802111328359059,
+    "std": 0.03591575570443121,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "conditional_w1",
+    "mean": 0.7379929592268447,
+    "std": 0.04349806542429489,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "u_l1",
+    "mean": 0.5943055555555555,
+    "std": 0.027146511464736626,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "c_l1",
+    "mean": 3.4108440688378336,
+    "std": 1.008807435791959,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "spread_specific_error",
+    "mean": 4.985412905746353,
+    "std": 3.447806428266856,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "imbalance_specific_error",
+    "mean": 2.193324575992173,
+    "std": 0.30823674577164784,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22754514139558757,
+    "std": 0.008394335686033722,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "impact_response_error",
+    "mean": 4.907333412949631,
+    "std": 1.2081280098462477,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "trades",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 109.5415298322526,
+    "std": 3.498206776763576,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "score_main",
+    "mean": 3.0046164140965343,
+    "std": 0.2512204156603743,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "tstr_macro_f1",
+    "mean": 0.17905410149802362,
+    "std": 0.023624264538690907,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "disc_auc_gap",
+    "mean": 0.5,
+    "std": 0.0,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "unconditional_w1",
+    "mean": 671.1226384319161,
+    "std": 244.4613681771626,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "conditional_w1",
+    "mean": 634.6674709142762,
+    "std": 233.51296425509452,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "u_l1",
+    "mean": 1.2611074074074073,
+    "std": 0.08072457844521556,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "c_l1",
+    "mean": 11450.560709545982,
+    "std": 4384.159982314301,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "spread_specific_error",
+    "mean": 26009.578280564936,
+    "std": 2403.0595834405644,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "imbalance_specific_error",
+    "mean": 7.881433732722246,
+    "std": 1.6421070207744413,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1288694446400846,
+    "std": 0.006345718333373925,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "impact_response_error",
+    "mean": 9872.632654473175,
+    "std": 3440.143363117776,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "trades",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2633.1568181747566,
+    "std": 10.7012410535684,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "score_main",
+    "mean": 0.5656863736999234,
+    "std": 0.021070013750953312,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "tstr_macro_f1",
+    "mean": 0.279524720033228,
+    "std": 0.02133552988475841,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "disc_auc_gap",
+    "mean": 0.49852627772196606,
+    "std": 0.0004463622065842306,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "unconditional_w1",
+    "mean": 0.620619820303348,
+    "std": 0.07222640761692058,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "conditional_w1",
+    "mean": 0.7576820256498753,
+    "std": 0.05218617126498784,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "u_l1",
+    "mean": 1.0732037037037037,
+    "std": 0.09840257274955326,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "c_l1",
+    "mean": 4.717984905025608,
+    "std": 0.3067116479994206,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "spread_specific_error",
+    "mean": 0.9777371959992396,
+    "std": 0.03808804401339698,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "imbalance_specific_error",
+    "mean": 1.6905883372170902,
+    "std": 0.07475906145445613,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.12872410706335663,
+    "std": 0.002572435324154012,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "impact_response_error",
+    "mean": 3.894479865947834,
+    "std": 1.0067726111490571,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "trades",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 1315.441313677778,
+    "std": 6.6438851368920995,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "score_main",
+    "mean": 0.5272087877911502,
+    "std": 0.10118194648717385,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "tstr_macro_f1",
+    "mean": NaN,
+    "std": NaN,
+    "n": 5,
+    "n_valid": 0
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "disc_auc_gap",
+    "mean": 0.467301217102441,
+    "std": 0.0031089390855623135,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "unconditional_w1",
+    "mean": 0.7673267962332528,
+    "std": 0.33980943988472284,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "conditional_w1",
+    "mean": 0.8606404739452381,
+    "std": 0.3159020319988009,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "u_l1",
+    "mean": 0.799045138888889,
+    "std": 0.09234196815876158,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "c_l1",
+    "mean": 1211.4807816217426,
+    "std": 501.3606396603637,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "spread_specific_error",
+    "mean": 4830.080472228615,
+    "std": 1999.4357359869175,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "imbalance_specific_error",
+    "mean": 2.141867721540883,
+    "std": 0.5222024097973607,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.25210050591053423,
+    "std": 0.02178233112117857,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "impact_response_error",
+    "mean": 3.5383421349326105,
+    "std": 1.8370276761353512,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "cgan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 140.18540003712081,
+    "std": 3.3238723720424375,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "score_main",
+    "mean": 0.4491937439617931,
+    "std": 0.02137813048380167,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2458527559872018,
+    "std": 0.030088639699505627,
+    "n": 5,
+    "n_valid": 3
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "disc_auc_gap",
+    "mean": 0.42546420895133313,
+    "std": 0.014428436504880557,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "unconditional_w1",
+    "mean": 0.4730653242576784,
+    "std": 0.049386669513685366,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "conditional_w1",
+    "mean": 0.6204004867529556,
+    "std": 0.02869096747911171,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "u_l1",
+    "mean": 0.8882407407407408,
+    "std": 0.04212674237155668,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "c_l1",
+    "mean": 1.5064419285733242,
+    "std": 0.41997607508868373,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "spread_specific_error",
+    "mean": 2.4988558070682396,
+    "std": 1.5922052934576532,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "imbalance_specific_error",
+    "mean": 1.2815909550344546,
+    "std": 0.13120255502104702,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.21733035488055252,
+    "std": 0.005899661501739313,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "impact_response_error",
+    "mean": 1.356757271072601,
+    "std": 0.22296505797821814,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "cgan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 20.88595228657747,
+    "std": 0.02551363425065088,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "score_main",
+    "mean": 2.1918525622583873,
+    "std": 0.3633520465032352,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.19632005664760585,
+    "std": 0.0,
+    "n": 5,
+    "n_valid": 1
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "disc_auc_gap",
+    "mean": 0.4999993400084343,
+    "std": 1.0662704797487911e-06,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "unconditional_w1",
+    "mean": 92.06214120160142,
+    "std": 56.42457367591615,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "conditional_w1",
+    "mean": 92.28072166906755,
+    "std": 56.64123073368609,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "u_l1",
+    "mean": 1.7092592592592595,
+    "std": 0.0996323755301072,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "c_l1",
+    "mean": 1470.2874197335618,
+    "std": 1183.3771703618754,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "spread_specific_error",
+    "mean": 5689.670641168754,
+    "std": 4734.600461199753,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "imbalance_specific_error",
+    "mean": 3.5271586080509523,
+    "std": 2.381995170851249,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.25848211393976583,
+    "std": 0.1420620660576631,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "impact_response_error",
+    "mean": 866.7171568893609,
+    "std": 1275.4853877986973,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "cgan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 266.1545433379555,
+    "std": 4.156713767196386,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "score_main",
+    "mean": 0.6089912530017801,
+    "std": 0.08170836062767638,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.22260490386176895,
+    "std": 0.03229386030245341,
+    "n": 5,
+    "n_valid": 4
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "disc_auc_gap",
+    "mean": 0.4995148219107796,
+    "std": 0.0003809638077113959,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "unconditional_w1",
+    "mean": 0.86200480343924,
+    "std": 0.331290024889322,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "conditional_w1",
+    "mean": 0.9569619730429318,
+    "std": 0.3221024069704756,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "u_l1",
+    "mean": 1.3596592592592593,
+    "std": 0.055682223313561104,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "c_l1",
+    "mean": 46.134903934357276,
+    "std": 85.9586985289859,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "spread_specific_error",
+    "mean": 173.7686998097204,
+    "std": 345.9851646879569,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "imbalance_specific_error",
+    "mean": 2.188178707145485,
+    "std": 0.5165374535013458,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.34833534661013266,
+    "std": 0.0720603165442775,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "impact_response_error",
+    "mean": 5.901854087729385,
+    "std": 3.7707583523135892,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "cgan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 269.3874975976845,
+    "std": 5.2716191813678925,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "score_main",
+    "mean": 0.6473295608827914,
+    "std": 0.08815248496015243,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.41649149525347334,
+    "std": 0.025607654926759968,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "disc_auc_gap",
+    "mean": 0.40228600367175965,
+    "std": 0.0037368788602413342,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "unconditional_w1",
+    "mean": 1.4134193733183529,
+    "std": 0.5903924135928623,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "conditional_w1",
+    "mean": 1.6099006074166862,
+    "std": 0.5855108098202549,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "u_l1",
+    "mean": 0.6243245442708333,
+    "std": 0.060019176841780326,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "c_l1",
+    "mean": 870.5847519264514,
+    "std": 634.0424973155839,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "spread_specific_error",
+    "mean": 3280.361294837376,
+    "std": 2583.3712791192474,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "imbalance_specific_error",
+    "mean": 2.413781757222688,
+    "std": 0.11441900543721387,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.3053278956646591,
+    "std": 0.022961357147989105,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "impact_response_error",
+    "mean": 39.61092311974744,
+    "std": 23.66900956276358,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timecausalvae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 249.3569332860514,
+    "std": 5.47410138912556,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "score_main",
+    "mean": 0.43223483792402845,
+    "std": 0.014580730295839287,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.29215383172917536,
+    "std": 0.005720216748014581,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "disc_auc_gap",
+    "mean": 0.27247929573790763,
+    "std": 0.024687661885127082,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "unconditional_w1",
+    "mean": 0.2934242334451494,
+    "std": 0.04298131068048406,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "conditional_w1",
+    "mean": 0.6381518288147939,
+    "std": 0.02690444297324691,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "u_l1",
+    "mean": 0.720787037037037,
+    "std": 0.04281103405067829,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "c_l1",
+    "mean": 2.4841597071294386,
+    "std": 0.7415434673258601,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "spread_specific_error",
+    "mean": 4.644052895199399,
+    "std": 2.5963174570210814,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "imbalance_specific_error",
+    "mean": 1.7467949568805587,
+    "std": 0.15137162234136134,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22525456818162642,
+    "std": 0.008266011436365659,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "impact_response_error",
+    "mean": 3.9670785947439073,
+    "std": 0.9814602716585311,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timecausalvae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 37.224941506671406,
+    "std": 0.2410104817462794,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "score_main",
+    "mean": 2.3077816540813254,
+    "std": 0.3699175206877849,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.17908172159086608,
+    "std": 0.009843386428767479,
+    "n": 5,
+    "n_valid": 3
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "disc_auc_gap",
+    "mean": 0.5,
+    "std": 0.0,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "unconditional_w1",
+    "mean": 139.4933657815119,
+    "std": 82.83184022400636,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "conditional_w1",
+    "mean": 139.14129657947365,
+    "std": 82.67167680611318,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "u_l1",
+    "mean": 1.557898148148148,
+    "std": 0.038980431498131456,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "c_l1",
+    "mean": 2722.5668901175804,
+    "std": 1056.1791534449317,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "spread_specific_error",
+    "mean": 5837.854125686241,
+    "std": 563.548136589898,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "imbalance_specific_error",
+    "mean": 3.558764829247982,
+    "std": 0.4534479853169304,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.13179788365115974,
+    "std": 0.005086309652014364,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "impact_response_error",
+    "mean": 8276.696863258569,
+    "std": 8115.392904314519,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timecausalvae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 459.8312626841168,
+    "std": 9.539006333100497,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "score_main",
+    "mean": 0.5506739533261212,
+    "std": 0.04844828410915715,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2765130497656008,
+    "std": 0.02756884644561372,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "disc_auc_gap",
+    "mean": 0.49466456398701075,
+    "std": 0.002309605266318944,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "unconditional_w1",
+    "mean": 0.609714141556781,
+    "std": 0.15860009585921186,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "conditional_w1",
+    "mean": 0.701453493092836,
+    "std": 0.16661781779604495,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "u_l1",
+    "mean": 1.0585425925925926,
+    "std": 0.13365784347386817,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "c_l1",
+    "mean": 14.658993618102865,
+    "std": 24.77443113410467,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "spread_specific_error",
+    "mean": 50.88702683639668,
+    "std": 100.29824489315182,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "imbalance_specific_error",
+    "mean": 2.4621467678337945,
+    "std": 0.7353836422974043,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1425417138926422,
+    "std": 0.017132958970118316,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "impact_response_error",
+    "mean": 30.606834684799175,
+    "std": 30.96976955668907,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timecausalvae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 467.6642910003041,
+    "std": 10.380083905790674,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "score_main",
+    "mean": 0.5106714265058535,
+    "std": 0.003367620386483339,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.27069697209546445,
+    "std": 0.015985153424779283,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "disc_auc_gap",
+    "mean": 0.4822121414452328,
+    "std": 0.0051813987905775126,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "unconditional_w1",
+    "mean": 0.471737417733466,
+    "std": 0.020714622683963263,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "conditional_w1",
+    "mean": 0.5612004776644912,
+    "std": 0.018248812162939203,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "u_l1",
+    "mean": 1.1790228949652777,
+    "std": 0.04872573855629974,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "c_l1",
+    "mean": 128.74196376935402,
+    "std": 13.81058471033158,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "spread_specific_error",
+    "mean": 501.20723038277464,
+    "std": 54.62083475909543,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "imbalance_specific_error",
+    "mean": 1.207570347904835,
+    "std": 0.07221410059196744,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.2984247546554521,
+    "std": 0.019827984720251157,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "impact_response_error",
+    "mean": 32.91605562940267,
+    "std": 7.388495735179746,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "timegan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 313.63858032079105,
+    "std": 11.311733312083376,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "score_main",
+    "mean": 0.5371573897376378,
+    "std": 0.010210909433240274,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.286215022742467,
+    "std": 0.009493181052563788,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "disc_auc_gap",
+    "mean": 0.39760841425353505,
+    "std": 0.02102954413920806,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "unconditional_w1",
+    "mean": 0.5151623111282946,
+    "std": 0.043524826315208015,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "conditional_w1",
+    "mean": 0.8685604714386297,
+    "std": 0.023286918620892702,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "u_l1",
+    "mean": 1.182986111111111,
+    "std": 0.08237238514014429,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "c_l1",
+    "mean": 2.614551575364009,
+    "std": 0.8910992667149529,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "spread_specific_error",
+    "mean": 4.723339171061039,
+    "std": 3.1046526814953497,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "imbalance_specific_error",
+    "mean": 1.9741495954868398,
+    "std": 0.21295064260356675,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.25046772755192515,
+    "std": 0.023190153536803003,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "impact_response_error",
+    "mean": 30.705584541048758,
+    "std": 11.27949470014235,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "timegan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 48.19098744806575,
+    "std": 1.0783909984860687,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "score_main",
+    "mean": 3.102666688760441,
+    "std": 0.8527322682854167,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.1533769794907224,
+    "std": 0.005381134303037433,
+    "n": 5,
+    "n_valid": 3
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "disc_auc_gap",
+    "mean": 0.4999612894702074,
+    "std": 7.742105958516988e-05,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "unconditional_w1",
+    "mean": 2444.3889067922623,
+    "std": 4241.870065448223,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "conditional_w1",
+    "mean": 2445.898516655146,
+    "std": 4244.126986576557,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "u_l1",
+    "mean": 1.8009629629629629,
+    "std": 0.04702977196737338,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "c_l1",
+    "mean": 26504.285655512696,
+    "std": 29748.65542654666,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "spread_specific_error",
+    "mean": 103600.11211147849,
+    "std": 119731.27426895098,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "imbalance_specific_error",
+    "mean": 1.9670093011516339,
+    "std": 0.6027171334277639,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.2944072043308613,
+    "std": 0.127804748909135,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "impact_response_error",
+    "mean": 3134.087220834255,
+    "std": 2866.771768787194,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "timegan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 586.2119118151411,
+    "std": 12.825195568424821,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "score_main",
+    "mean": 0.6290312737456871,
+    "std": 0.05928305788349905,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2352494742641427,
+    "std": 0.04275438999670761,
+    "n": 5,
+    "n_valid": 4
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "disc_auc_gap",
+    "mean": 0.49962298476848244,
+    "std": 0.0004622105486228515,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "unconditional_w1",
+    "mean": 0.8753663420977489,
+    "std": 0.14586842892158405,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "conditional_w1",
+    "mean": 0.9614704657422426,
+    "std": 0.18408293848509052,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "u_l1",
+    "mean": 1.6721092592592595,
+    "std": 0.06855848068874063,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "c_l1",
+    "mean": 3.7557777053882275,
+    "std": 0.7250598821826632,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "spread_specific_error",
+    "mean": 0.7984873794672189,
+    "std": 0.20496767042518646,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "imbalance_specific_error",
+    "mean": 1.9463035210514292,
+    "std": 0.808928631494499,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.265036926701382,
+    "std": 0.10417930014323326,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "impact_response_error",
+    "mean": 50.02099233467171,
+    "std": 26.92524171220944,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "timegan",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 575.2926620837146,
+    "std": 16.17535190171394,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "score_main",
+    "mean": 0.5197008134119763,
+    "std": 0.07203655821360024,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.42301085873472893,
+    "std": 0.0155003864160443,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "disc_auc_gap",
+    "mean": 0.4068918232908195,
+    "std": 0.004028073494396761,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "unconditional_w1",
+    "mean": 0.7447150185226341,
+    "std": 0.38526505759980884,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "conditional_w1",
+    "mean": 0.9357835158714215,
+    "std": 0.38052494662653014,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "u_l1",
+    "mean": 0.5584228515625,
+    "std": 0.035169315500524115,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "c_l1",
+    "mean": 769.3233025904544,
+    "std": 149.5797900922271,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "spread_specific_error",
+    "mean": 3011.16289740287,
+    "std": 645.0575557672402,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "imbalance_specific_error",
+    "mean": 1.9586972169702306,
+    "std": 0.09065981235058211,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.2982682511651378,
+    "std": 0.016343596773009204,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "impact_response_error",
+    "mean": 35.431535090563976,
+    "std": 27.838006548535144,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "synthetic",
+    "variant": "kovae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 508.885229133173,
+    "std": 2.619218485432351,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "score_main",
+    "mean": 0.4045114051179291,
+    "std": 0.011022678046843164,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.3078310416261908,
+    "std": 0.025590533735300108,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "disc_auc_gap",
+    "mean": 0.23272605904575486,
+    "std": 0.02629064380475446,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "unconditional_w1",
+    "mean": 0.2573469977565754,
+    "std": 0.01365223442456482,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "conditional_w1",
+    "mean": 0.5919720250336618,
+    "std": 0.02605627493280259,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "u_l1",
+    "mean": 0.6169675925925926,
+    "std": 0.022052617624706367,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "c_l1",
+    "mean": 2.197872107657123,
+    "std": 0.3940147166127229,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "spread_specific_error",
+    "mean": 3.2743278128580933,
+    "std": 0.9824816264317279,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "imbalance_specific_error",
+    "mean": 1.9732738042751368,
+    "std": 0.19773633817943093,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22705648086946778,
+    "std": 0.010135370906513513,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "impact_response_error",
+    "mean": 5.7287900194288905,
+    "std": 1.651012010005458,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "optiver",
+    "variant": "kovae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 56.729178161024,
+    "std": 0.7814746424262137,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "score_main",
+    "mean": 2.2139691866380784,
+    "std": 0.5212336153910351,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.17077954336489817,
+    "std": 0.015213002501764808,
+    "n": 5,
+    "n_valid": 4
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "disc_auc_gap",
+    "mean": 0.5,
+    "std": 0.0,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "unconditional_w1",
+    "mean": 110.13901295169606,
+    "std": 64.09700103287972,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "conditional_w1",
+    "mean": 109.95372974738375,
+    "std": 63.91739465892253,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "u_l1",
+    "mean": 1.520361111111111,
+    "std": 0.051008025068602594,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "c_l1",
+    "mean": 2696.8150839319305,
+    "std": 1570.2143658551413,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "spread_specific_error",
+    "mean": 4903.655608479276,
+    "std": 405.02564167311203,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "imbalance_specific_error",
+    "mean": 3.1930771146551686,
+    "std": 0.844470303926422,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1316987601497227,
+    "std": 0.008880815010456594,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "impact_response_error",
+    "mean": 6409.4019567564255,
+    "std": 7635.433113884194,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "cryptos",
+    "variant": "kovae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 734.015042396107,
+    "std": 0.6849516529043573,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "score_main",
+    "mean": 0.5774620463305609,
+    "std": 0.06226910922559969,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "tstr_macro_f1",
+    "mean": 0.26487168270948463,
+    "std": 0.028838833724853952,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "disc_auc_gap",
+    "mean": 0.49379585282642563,
+    "std": 0.001988342876250959,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "unconditional_w1",
+    "mean": 0.6997365722750916,
+    "std": 0.220902960192152,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "conditional_w1",
+    "mean": 0.7823183159090632,
+    "std": 0.23154085341216837,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "u_l1",
+    "mean": 1.1138222222222223,
+    "std": 0.11059333392001784,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "c_l1",
+    "mean": 2.1826065819873794,
+    "std": 0.5819321987755092,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "spread_specific_error",
+    "mean": 0.7199289692973452,
+    "std": 0.0450456238398166,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "imbalance_specific_error",
+    "mean": 3.0272166633688946,
+    "std": 1.0865991969969915,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.16034673839252428,
+    "std": 0.007399692691148859,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "impact_response_error",
+    "mean": 15.965272945750751,
+    "std": 10.498820208301838,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "baseline",
+    "dataset": "es_mbp_10",
+    "variant": "kovae",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 734.1490263604403,
+    "std": 1.3931641775834547,
+    "n": 5,
+    "n_valid": 5
+  }
+]

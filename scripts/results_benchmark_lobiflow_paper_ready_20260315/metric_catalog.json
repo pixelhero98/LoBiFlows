@@ -1,0 +1,1922 @@
+[
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.3710982948879725,
+    "std": 0.010469275584888346,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.42697591843305566,
+    "std": 0.01634208664974437,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.3994431502727846,
+    "std": 0.01654451581684205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.250114294996695,
+    "std": 0.010116619970976714,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.3358130878082187,
+    "std": 0.016167145502120114,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.4249267578125,
+    "std": 0.02540902451932937,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 28.410487396280608,
+    "std": 8.426230391117446,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 109.41611229785072,
+    "std": 33.45705894130863,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3654274656908734,
+    "std": 0.1369488151254359,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.24159008311525448,
+    "std": 0.021519671052429704,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 3.0182059945676967,
+    "std": 0.9294089269948062,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "synthetic",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2547.4610484386276,
+    "std": 61.512835141501874,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.4050212868518933,
+    "std": 0.01405848243345956,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.4172945575081812,
+    "std": 0.01767583174073932,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.45546217411486956,
+    "std": 0.012725886430400634,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.29705072112870556,
+    "std": 0.029928157147895665,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.38420448792208745,
+    "std": 0.0454198747860373,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 0.5001519097222222,
+    "std": 0.041193224177111215,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 140.4303698315524,
+    "std": 105.291077287165,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 555.4890813511954,
+    "std": 420.5741167890928,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3384071606369907,
+    "std": 0.07253818902537461,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.24616450037124732,
+    "std": 0.007743763105521046,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 5.030597293802078,
+    "std": 4.266115954389281,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "synthetic",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 1279.0904228853633,
+    "std": 31.074144091662664,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.3706572402373188,
+    "std": 0.005665551417870419,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.4288165948594956,
+    "std": 0.013091806425370715,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.40477539154804365,
+    "std": 0.0070716250171362965,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.23804936950497485,
+    "std": 0.02157336871051098,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.34210192186372895,
+    "std": 0.014887358462152344,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 0.41728244357638894,
+    "std": 0.027412221981379777,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 97.59736662783936,
+    "std": 120.79265776876646,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 386.0450793689608,
+    "std": 483.11947179860925,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.4231403808392666,
+    "std": 0.07320198551818019,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.25915399979349235,
+    "std": 0.012152191441831826,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 2.318285953709989,
+    "std": 0.8110674378902363,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2544.0755385488346,
+    "std": 60.68114647950128,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.3734457774932093,
+    "std": 0.020957551350440223,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.42893254083966126,
+    "std": 0.01455431490590493,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.40601430643557607,
+    "std": 0.01736284703008831,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.2508003863832053,
+    "std": 0.048349619129157764,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.3433900770164032,
+    "std": 0.04255723180519029,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 0.4497395833333333,
+    "std": 0.08276077403802345,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 179.3149273828075,
+    "std": 169.54440471270536,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 712.8527647284143,
+    "std": 677.804012428118,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.3537530590376712,
+    "std": 0.09822507443475771,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.2613689129360973,
+    "std": 0.011736379023099265,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 1.652233331202737,
+    "std": 0.045574760087833045,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "synthetic",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2679.3506454278636,
+    "std": 75.7155135611272,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.35950107278039833,
+    "std": 0.011799550000731617,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.30193906576859086,
+    "std": 0.027639738900074876,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.14215794015915267,
+    "std": 0.018409915125893708,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.20815124141282002,
+    "std": 0.013348614066073503,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.5076469150383496,
+    "std": 0.01775325474930386,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.4519212962962963,
+    "std": 0.0195736174567435,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 2.6867482189648095,
+    "std": 1.136153839407262,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 5.134624981286153,
+    "std": 3.942511786583811,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.791745877434326,
+    "std": 0.11946746618176322,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.216205180591102,
+    "std": 0.009700784706494632,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 3.95416751875308,
+    "std": 1.1570185536078064,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "optiver",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 769.6351519236083,
+    "std": 1.6063245539466953,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.41303458525138514,
+    "std": 0.010144929233172914,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.301798538983292,
+    "std": 0.021001525497552614,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.286333688428072,
+    "std": 0.016918218436268895,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.33600919952267455,
+    "std": 0.021878161938996065,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.461327107911962,
+    "std": 0.020036946583351922,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 0.5994212962962964,
+    "std": 0.032099479529687336,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 1.5079451770078591,
+    "std": 0.23214142420057746,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 1.809644203198199,
+    "std": 0.5254013035528259,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.404353398927006,
+    "std": 0.14729108986289857,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.21580148238160407,
+    "std": 0.013244279995306881,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 2.5556168241973514,
+    "std": 0.6483506212422241,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "optiver",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 193.13621146268108,
+    "std": 0.7126262516000861,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.3626552611739337,
+    "std": 0.00755846836622446,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.30619394947228956,
+    "std": 0.017780185961421596,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.16033599576840907,
+    "std": 0.010982902662622763,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.22447599874157503,
+    "std": 0.018042745146447874,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.4846108981449316,
+    "std": 0.02140082802037109,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 0.4428009259259259,
+    "std": 0.026047005625553447,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 2.6809384620526466,
+    "std": 1.0467619022406687,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 4.750939849467784,
+    "std": 3.3880513879546483,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.7345467833059884,
+    "std": 0.06439789470208988,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22225582367428345,
+    "std": 0.010353986375272642,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 3.916600344709644,
+    "std": 1.104252009236424,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 768.3489604665535,
+    "std": 1.4961119606053517,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.3612776580475511,
+    "std": 0.007535604797831531,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2920772988200217,
+    "std": 0.007663853150195665,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.13595672319253846,
+    "std": 0.0134733410126782,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.21920867155686427,
+    "std": 0.0147553301794981,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.49852275045514316,
+    "std": 0.02366576469330433,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 0.458611111111111,
+    "std": 0.03053473266354267,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 1.9324383130629954,
+    "std": 0.4822843991714561,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 2.6829113639243127,
+    "std": 1.3049567272981046,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.6328692885229636,
+    "std": 0.12871495931273585,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.22205754152819085,
+    "std": 0.009141565562841104,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 3.8404773468383104,
+    "std": 1.001588826398407,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "optiver",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 812.8055905208587,
+    "std": 4.127694427271591,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 1.8299895204943186,
+    "std": 0.10702196093390917,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.15963983445701396,
+    "std": 0.012204307066216889,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.49986247465388856,
+    "std": 6.627768202517516e-05,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 63.002808093996144,
+    "std": 25.98176916707282,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 60.92265893529735,
+    "std": 25.40830183812129,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 1.2843444444444443,
+    "std": 0.12181420129233017,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 1627.2339403651854,
+    "std": 1254.7812365493908,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 2056.0104678045545,
+    "std": 593.1417030752191,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 3.612035340811155,
+    "std": 0.6152696087755126,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.13840735702133214,
+    "std": 0.005135700345772313,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 4532.193402766025,
+    "std": 4364.67673509911,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "cryptos",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 5245.40653865086,
+    "std": 20.769946632111136,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 1.7140710280268312,
+    "std": 0.1880186886238264,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.19432436680408952,
+    "std": 0.029253604082541247,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.4989174389783767,
+    "std": 0.0005651091679843641,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 34.67956782234931,
+    "std": 35.8871598000206,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 33.44958793592859,
+    "std": 33.863804600409445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 1.4566537037037037,
+    "std": 0.06508320584549895,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 2983.2664445765727,
+    "std": 2225.3797252353947,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 3019.528256459147,
+    "std": 1921.138447045013,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 4.449904588691197,
+    "std": 1.2589662209408328,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1434529881698999,
+    "std": 0.016663905676871205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 11061.656632802202,
+    "std": 5936.251641879544,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "cryptos",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2614.83636872222,
+    "std": 34.396696762207554,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 2.1224671206521686,
+    "std": 0.4804468872462573,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.1730861511806594,
+    "std": 0.015576791149142519,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.4999566683969488,
+    "std": 3.47145999878413e-05,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 80.99564343537482,
+    "std": 43.46168828753987,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 79.51616738822774,
+    "std": 42.72269470136583,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 1.436325925925926,
+    "std": 0.05027270501658431,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 3184.2776492846397,
+    "std": 2170.4279571300167,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 2793.622174404008,
+    "std": 752.2702914622511,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 3.8329599842750297,
+    "std": 0.6085626183457142,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14140760214802217,
+    "std": 0.013355162098377586,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 6378.676302036765,
+    "std": 4314.878706066797,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 4901.6040180910695,
+    "std": 56.08847161849706,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 1.4974381937580394,
+    "std": 0.1429160200753879,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.17963951050795568,
+    "std": 0.028757976522179388,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.4996392337627443,
+    "std": 0.0003545593226543055,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 13.468144014430106,
+    "std": 10.2154225027114,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 13.126895570973591,
+    "std": 9.661123589280928,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 1.255601851851852,
+    "std": 0.1319341902448171,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 1379.4413108811561,
+    "std": 773.8315989115845,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 1976.4825182605389,
+    "std": 631.0545338555543,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 3.5413131723528743,
+    "std": 0.25792023473967796,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14348650769186247,
+    "std": 0.007419953227604252,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 3204.1717977782646,
+    "std": 2211.998140883923,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "cryptos",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 5184.435773719645,
+    "std": 72.15950272737354,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "score_main",
+    "mean": 0.4568847584038001,
+    "std": 0.010492179720371302,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "tstr_macro_f1",
+    "mean": 0.3377140891779877,
+    "std": 0.023277323132966564,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "disc_auc_gap",
+    "mean": 0.49453261806142174,
+    "std": 0.006309339868114259,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "unconditional_w1",
+    "mean": 0.37644851171857174,
+    "std": 0.014546573794070051,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "conditional_w1",
+    "mean": 0.4223079220649453,
+    "std": 0.025988836533289445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "u_l1",
+    "mean": 0.9710944444444444,
+    "std": 0.04214563855380965,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "c_l1",
+    "mean": 11.849423082056042,
+    "std": 14.04743271367897,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "spread_specific_error",
+    "mean": 43.48474802231586,
+    "std": 56.221477033496136,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "imbalance_specific_error",
+    "mean": 1.2019643495406829,
+    "std": 0.10598351899490698,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14346458504153747,
+    "std": 0.004942924028531126,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "impact_response_error",
+    "mean": 1.5963141879198015,
+    "std": 0.38578931831102314,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "quality",
+    "dataset": "es_mbp_10",
+    "variant": "quality",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2516.2745132045043,
+    "std": 43.603073666166644,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "score_main",
+    "mean": 0.45886721087318316,
+    "std": 0.008335107293870098,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "tstr_macro_f1",
+    "mean": 0.3265461673625064,
+    "std": 0.012190090355790533,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "disc_auc_gap",
+    "mean": 0.49730512790600273,
+    "std": 0.001345934057165649,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "unconditional_w1",
+    "mean": 0.3765803461455362,
+    "std": 0.024311729459043672,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "conditional_w1",
+    "mean": 0.4140685492416238,
+    "std": 0.020145596550709015,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "u_l1",
+    "mean": 1.0011648148148147,
+    "std": 0.05537617782005948,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "c_l1",
+    "mean": 37.80164353201993,
+    "std": 73.43211436524244,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "spread_specific_error",
+    "mean": 147.6605367554007,
+    "std": 293.7984037965992,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "imbalance_specific_error",
+    "mean": 1.165672657542863,
+    "std": 0.1030082882703116,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.14668819813474093,
+    "std": 0.004701743559443437,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "impact_response_error",
+    "mean": 1.2803355589748853,
+    "std": 0.18356510537549908,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "speed",
+    "dataset": "es_mbp_10",
+    "variant": "speed",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2518.5714864692027,
+    "std": 42.248354391070094,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "score_main",
+    "mean": 0.48261778019931184,
+    "std": 0.011761810368319884,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "tstr_macro_f1",
+    "mean": 0.2957746327911214,
+    "std": 0.016796672354922507,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "disc_auc_gap",
+    "mean": 0.4975477285523174,
+    "std": 0.000922114040953138,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "unconditional_w1",
+    "mean": 0.4251886040004006,
+    "std": 0.023676099522071812,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "conditional_w1",
+    "mean": 0.45928150452991046,
+    "std": 0.023069944196988445,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "u_l1",
+    "mean": 1.0467444444444445,
+    "std": 0.05226561062015778,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "c_l1",
+    "mean": 30.326054087380196,
+    "std": 49.432956207743004,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "spread_specific_error",
+    "mean": 116.50765583659556,
+    "std": 197.60146469162834,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "imbalance_specific_error",
+    "mean": 1.1916242660370826,
+    "std": 0.10057216532223205,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.17273309998990727,
+    "std": 0.008225023804236497,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "impact_response_error",
+    "mean": 2.5930750040343105,
+    "std": 0.9071425343441801,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "transformer",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2375.529996816767,
+    "std": 65.97918672156196,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "score_main",
+    "mean": 0.45998187661368367,
+    "std": 0.006235478970635715,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "tstr_macro_f1",
+    "mean": 0.334666861216288,
+    "std": 0.018988123717495285,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "disc_auc_gap",
+    "mean": 0.4959818627805486,
+    "std": 0.0026144725636843627,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "unconditional_w1",
+    "mean": 0.3858996514352616,
+    "std": 0.014914789917881501,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "conditional_w1",
+    "mean": 0.42306032453645714,
+    "std": 0.014071720429537303,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "u_l1",
+    "mean": 1.0633259259259258,
+    "std": 0.048634435462511554,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "c_l1",
+    "mean": 13.395206706011654,
+    "std": 24.658437343918525,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "spread_specific_error",
+    "mean": 50.00921986696241,
+    "std": 98.54150139085064,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "imbalance_specific_error",
+    "mean": 1.1847773352912498,
+    "std": 0.04225942695196881,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "ret_vol_acf_error",
+    "mean": 0.1466166466069467,
+    "std": 0.0043032539797712025,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "impact_response_error",
+    "mean": 2.118393354543571,
+    "std": 1.244445147144741,
+    "n": 5,
+    "n_valid": 5
+  },
+  {
+    "section": "architecture",
+    "dataset": "es_mbp_10",
+    "variant": "hybrid",
+    "metric": "efficiency_ms_per_sample",
+    "mean": 2491.143170039868,
+    "std": 52.13788146312719,
+    "n": 5,
+    "n_valid": 5
+  }
+]
