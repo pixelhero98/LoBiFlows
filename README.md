@@ -26,6 +26,65 @@ paper-ready evaluation.
 - `Model/export_model_metric_catalogs.py`: flat metric catalog export
 - `Model/test_lobiflow.py`: smoke and regression suite
 
+## Usage
+
+Run the main LoBiFlow suite with dataset-specific defaults:
+
+```bash
+cd Model
+python experiments_icassp.py --dataset synthetic --out_dir results_synth
+python experiments_icassp.py --dataset optiver --out_dir results_optiver
+python experiments_icassp.py --dataset cryptos --out_dir results_cryptos
+python experiments_icassp.py --dataset es_mbp_10 --out_dir results_es
+```
+
+Run the faster `NFE=1` speed variant:
+
+```bash
+cd Model
+python experiments_icassp.py --dataset cryptos --lobiflow_variant speed --out_dir results_cryptos_speed
+```
+
+Run the paper-ready benchmark bundle:
+
+```bash
+cd Model
+python benchmark_lobiflow_paper_ready.py
+```
+
+Export flat CSV/JSON metric catalogs:
+
+```bash
+cd Model
+python export_model_metric_catalogs.py
+```
+
+## Hyperparameter Tuning
+
+LoBiFlow applies dataset presets first, then CLI overrides. The main knobs are:
+
+- data: `--dataset`, `--data_path`, `--synthetic_length`
+- optimization: `--steps`, `--batch_size`, `--lr`, `--weight_decay`
+- context: `--history_len`, `--ctx_encoder`, `--ctx_causal`, `--ctx_local_kernel`, `--ctx_pool_scales`
+- sampling: `--eval_nfe`, `--solver`, `--lobiflow_variant`
+- evaluation: `--eval_horizon`, `--rollout_horizons`, `--eval_windows_*`
+
+Typical examples:
+
+```bash
+cd Model
+python experiments_icassp.py --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
+python experiments_icassp.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
+python experiments_icassp.py --dataset synthetic --synthetic_length 5000000 --steps 20000
+```
+
+Current quality presets:
+
+- `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
+- `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
+- `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
+
 ## Final Outputs
 
 Paper-ready benchmark outputs are written under:
