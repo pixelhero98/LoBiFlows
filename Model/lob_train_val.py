@@ -12,7 +12,6 @@ Adds evaluation helpers:
 
 from __future__ import annotations
 
-from dataclasses import replace
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 import copy
 import json
@@ -23,10 +22,32 @@ import torch
 from torch.utils.data import DataLoader
 from torch.optim.swa_utils import AveragedModel
 
-from lob_baselines import LOBConfig, BiFlowLOB, BiFlowNFLOB
+from lob_baselines import (
+    LOBConfig,
+    BiFlowLOB,
+    BiFlowNFLOB,
+    DeepMarketCGANBaseline,
+    DeepMarketTRADESBaseline,
+    TimeCausalVAEBaseline,
+    TimeGANBaseline,
+    KoVAEBaseline,
+)
 from lob_model import LoBiFlow
 from lob_datasets import L2FeatureMap, WindowedLOBParamsDataset, compute_basic_l2_metrics
 from lob_utils import flatten_dict, unflatten_to_nested, microstructure_series
+
+
+SUPPORTED_MODEL_NAMES = (
+    "lobiflow",
+    "biflow",
+    "biflow_nf",
+    "trades",
+    "cgan",
+    "timecausalvae",
+    "timegan",
+    "kovae",
+)
+CORE_L2_STATS = ("spread", "depth", "imb", "ret")
 
 
 # -----------------------------
@@ -54,16 +75,16 @@ def make_loader(
 
 
 def _parse_batch(batch):
-    """Supports:
+    """Unpack the dataset tuple emitted by WindowedLOBParamsDataset.
+
+    Supports:
       - (hist, tgt, meta)
       - (hist, tgt, cond, meta)
       - (hist, tgt, fut, meta)
       - (hist, tgt, fut, cond, meta)
 
-    Note: When len(batch)==4, we disambiguate fut vs cond by ndim:
-    cond is [B,C] (dim=2), fut is [B,H_fut,D] (dim=3).
-    This BREAKS if future_horizon==1 (fut would be [B,D], dim=2).
-    Currently safe because future_horizon=0 throughout.
+    Future horizons are emitted as rank-3 tensors [B, H_fut, D], while
+    conditioning features are rank-2 tensors [B, C].
     """
     if len(batch) == 3:
         hist, tgt, meta = batch
@@ -82,6 +103,41 @@ def _parse_batch(batch):
 def _torch_sync(device: torch.device):
     if device.type == "cuda" and torch.cuda.is_available():
         torch.cuda.synchronize(device)
+
+
+def resolve_context_length(max_available: int, *, horizon: int, cfg: Optional[LOBConfig]) -> int:
+    max_available = max(1, int(max_available))
+    if cfg is None or not bool(getattr(cfg, "adaptive_context", False)):
+        return max_available
+
+    ratio = float(getattr(cfg, "adaptive_context_ratio", 1.5))
+    ctx_min = int(getattr(cfg, "adaptive_context_min", 1))
+    ctx_max = int(getattr(cfg, "adaptive_context_max", max_available))
+    desired = int(round(max(1, int(horizon)) * ratio))
+    desired = max(ctx_min, desired)
+    desired = min(desired, ctx_max, max_available)
+    return max(1, desired)
+
+
+def crop_history_window(hist: torch.Tensor, context_len: int) -> torch.Tensor:
+    context_len = max(1, int(context_len))
+    if hist.dim() == 3:
+        return hist[:, -context_len:, :]
+    if hist.dim() == 2:
+        return hist[-context_len:, :]
+    raise ValueError(f"Unsupported history tensor rank: {hist.dim()}")
+
+
+def sample_training_context_length(max_available: int, cfg: Optional[LOBConfig]) -> int:
+    max_available = max(1, int(max_available))
+    if cfg is None or not bool(getattr(cfg, "train_variable_context", False)):
+        return max_available
+
+    min_len = max(1, int(getattr(cfg, "train_context_min", 1)))
+    max_len = int(getattr(cfg, "train_context_max", max_available))
+    min_len = min(min_len, max_available)
+    max_len = min(max(max_len, min_len), max_available)
+    return int(np.random.randint(min_len, max_len + 1))
 
 
 # -----------------------------
@@ -103,6 +159,70 @@ def _build_scheduler(opt: torch.optim.Optimizer, cfg: LOBConfig, total_steps: in
         return 1.0
 
     return torch.optim.lr_scheduler.LambdaLR(opt, lr_lambda)
+
+
+def _normalize_model_name(model_name: str) -> str:
+    normalized = model_name.lower().strip()
+    if normalized not in SUPPORTED_MODEL_NAMES:
+        raise ValueError(f"Unknown model_name={model_name}")
+    return normalized
+
+
+def _build_model(model_name: str, cfg: LOBConfig, device: torch.device) -> torch.nn.Module:
+    if model_name == "lobiflow":
+        return LoBiFlow(cfg).to(device)
+    if model_name == "biflow":
+        return BiFlowLOB(cfg).to(device)
+    if model_name == "trades":
+        return DeepMarketTRADESBaseline(cfg).to(device)
+    if model_name == "cgan":
+        return DeepMarketCGANBaseline(cfg).to(device)
+    if model_name == "timecausalvae":
+        return TimeCausalVAEBaseline(cfg).to(device)
+    if model_name == "timegan":
+        return TimeGANBaseline(cfg).to(device)
+    if model_name == "kovae":
+        return KoVAEBaseline(cfg).to(device)
+    return BiFlowNFLOB(cfg).to(device)
+
+
+def _compute_training_loss(
+    model: torch.nn.Module,
+    *,
+    tgt: torch.Tensor,
+    hist: torch.Tensor,
+    fut: Optional[torch.Tensor],
+    cond: Optional[torch.Tensor],
+    meta: Any,
+    loss_mode: Optional[str],
+) -> Tuple[torch.Tensor, Dict[str, float]]:
+    if isinstance(model, LoBiFlow):
+        return model.loss(tgt, hist, fut=fut, cond=cond, meta=meta)
+
+    if isinstance(model, BiFlowLOB):
+        loss = model.fm_loss(tgt, hist, cond=cond)
+        return loss, {"loss": float(loss.detach().cpu())}
+
+    if isinstance(model, BiFlowNFLOB):
+        mode = (loss_mode or "nll").lower()
+        if mode == "nll":
+            loss = model.nll_loss(tgt, hist, cond=cond)
+            return loss, {"loss": float(loss.detach().cpu()), "stage": "nll"}
+        if mode == "biflow":
+            loss, logs = model.biflow_loss(tgt, hist, cond=cond)
+            logs = dict(logs)
+            logs["loss"] = float(loss.detach().cpu())
+            logs["stage"] = "biflow"
+            return loss, logs
+        raise ValueError(f"Unknown loss_mode for BiFlowNFLOB: {loss_mode}")
+
+    if isinstance(model, DeepMarketTRADESBaseline):
+        return model.loss(tgt, hist, cond=cond, meta=meta)
+
+    if isinstance(model, (TimeCausalVAEBaseline, KoVAEBaseline)):
+        return model.loss(tgt, hist, cond=cond, meta=meta)
+
+    raise RuntimeError("Unexpected model type.")
 
 
 def train_loop(
@@ -139,18 +259,88 @@ def train_loop(
             "split boundaries, and batch_size."
         )
 
-    model_name = model_name.lower()
+    model_name = _normalize_model_name(model_name)
     if model is None:
-        if model_name in ("lobiflow", "ours"):
-            model = LoBiFlow(cfg).to(device)
-        elif model_name in ("biflow", "rectified_flow"):
-            model = BiFlowLOB(cfg).to(device)
-        elif model_name in ("biflow_nf", "nf"):
-            model = BiFlowNFLOB(cfg).to(device)
-        else:
-            raise ValueError(f"Unknown model_name={model_name}")
+        model = _build_model(model_name, cfg, device)
     else:
         model = model.to(device)
+
+    if isinstance(model, LoBiFlow):
+        model.set_param_normalizer(ds.params_mean, ds.params_std)
+
+    if isinstance(model, DeepMarketCGANBaseline):
+        gen_params = list(model.generator_hist.parameters()) + list(model.generator.parameters())
+        disc_params = list(model.discriminator_hist.parameters()) + list(model.discriminator.parameters())
+        opt_g = torch.optim.AdamW(gen_params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+        opt_d = torch.optim.AdamW(disc_params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+        model.train()
+        it = iter(loader)
+        for step in range(1, steps + 1):
+            try:
+                batch = next(it)
+            except StopIteration:
+                it = iter(loader)
+                batch = next(it)
+
+            hist, tgt, fut, cond, meta = _parse_batch(batch)
+            del fut, cond, meta
+            hist = hist.to(device).float()
+            tgt = tgt.to(device).float()
+
+            train_context_len = sample_training_context_length(hist.shape[1], cfg)
+            hist = crop_history_window(hist, train_context_len)
+
+            logs = model.adversarial_step(
+                tgt,
+                hist,
+                opt_g,
+                opt_d,
+                grad_clip=float(cfg.grad_clip),
+            )
+            if step % log_every == 0:
+                print(f"[{model_name}] step {step}/{steps}  gen={logs['gen_total']:.4f}  disc={logs['disc']:.4f}  details={logs}")
+        return model.eval()
+
+    if isinstance(model, TimeGANBaseline):
+        gen_params = (
+            list(model.history_encoder.parameters())
+            + list(model.embedder.parameters())
+            + list(model.recovery.parameters())
+            + list(model.generator.parameters())
+            + list(model.supervisor.parameters())
+        )
+        disc_params = list(model.discriminator.parameters())
+        opt_g = torch.optim.AdamW(gen_params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+        opt_d = torch.optim.AdamW(disc_params, lr=cfg.lr, weight_decay=cfg.weight_decay)
+
+        model.train()
+        it = iter(loader)
+        for step in range(1, steps + 1):
+            try:
+                batch = next(it)
+            except StopIteration:
+                it = iter(loader)
+                batch = next(it)
+
+            hist, tgt, fut, cond, meta = _parse_batch(batch)
+            del fut, cond, meta
+            hist = hist.to(device).float()
+            tgt = tgt.to(device).float()
+
+            train_context_len = sample_training_context_length(hist.shape[1], cfg)
+            hist = crop_history_window(hist, train_context_len)
+
+            logs = model.adversarial_step(
+                tgt,
+                hist,
+                opt_g,
+                opt_d,
+                grad_clip=float(cfg.grad_clip),
+            )
+            if step % log_every == 0:
+                print(f"[{model_name}] step {step}/{steps}  gen={logs['gen_total']:.4f}  disc={logs['disc']:.4f}  details={logs}")
+        return model.eval()
 
     opt = optimizer or torch.optim.AdamW(model.parameters(), lr=cfg.lr, weight_decay=cfg.weight_decay)
 
@@ -175,33 +365,26 @@ def train_loop(
             it = iter(loader)
             batch = next(it)
 
-        hist, tgt, fut, cond, _ = _parse_batch(batch)
+        hist, tgt, fut, cond, meta = _parse_batch(batch)
         hist = hist.to(device).float()
         tgt = tgt.to(device).float()
         fut = fut.to(device).float() if fut is not None else None
         cond = cond.to(device).float() if cond is not None else None
 
+        train_context_len = sample_training_context_length(hist.shape[1], cfg)
+        hist = crop_history_window(hist, train_context_len)
+
         opt.zero_grad(set_to_none=True)
 
-        if isinstance(model, LoBiFlow):
-            loss, logs = model.loss(tgt, hist, fut=fut, cond=cond)
-        elif isinstance(model, BiFlowLOB):
-            loss = model.fm_loss(tgt, hist, cond=cond)
-            logs = {"loss": float(loss.detach().cpu())}
-        elif isinstance(model, BiFlowNFLOB):
-            mode = (loss_mode or "nll").lower()
-            if mode == "nll":
-                loss = model.nll_loss(tgt, hist, cond=cond)
-                logs = {"loss": float(loss.detach().cpu()), "stage": "nll"}
-            elif mode == "biflow":
-                loss, logs = model.biflow_loss(tgt, hist, cond=cond)
-                logs = dict(logs)
-                logs["loss"] = float(loss.detach().cpu())
-                logs["stage"] = "biflow"
-            else:
-                raise ValueError(f"Unknown loss_mode for BiFlowNFLOB: {loss_mode}")
-        else:
-            raise RuntimeError("Unexpected model type.")
+        loss, logs = _compute_training_loss(
+            model,
+            tgt=tgt,
+            hist=hist,
+            fut=fut,
+            cond=cond,
+            meta=meta,
+            loss_mode=loss_mode,
+        )
 
         loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), cfg.grad_clip)
@@ -270,23 +453,24 @@ def generate_continuation(
 ) -> torch.Tensor:
     """Autoregressive continuation in normalized param space."""
     B, H, D = hist.shape
-    x_hist = hist.clone()
+    model_cfg = getattr(model, "cfg", None)
+    context_len = resolve_context_length(H, horizon=steps, cfg=model_cfg)
+    x_hist = crop_history_window(hist, context_len).clone()
     out = []
 
     for k in range(steps):
         cond_t = cond_seq[:, k, :] if cond_seq is not None else None
 
-        if isinstance(model, LoBiFlow):
+        if isinstance(model, (LoBiFlow, BiFlowLOB, DeepMarketTRADESBaseline)):
             x_next = model.sample(x_hist, cond=cond_t, steps=nfe)
-        elif isinstance(model, BiFlowLOB):
-            x_next = model.sample(x_hist, cond=cond_t, steps=nfe)
-        elif isinstance(model, BiFlowNFLOB):
+        elif isinstance(model, (BiFlowNFLOB, DeepMarketCGANBaseline, TimeCausalVAEBaseline, TimeGANBaseline, KoVAEBaseline)):
             x_next = model.sample(x_hist, cond=cond_t)
         else:
             raise RuntimeError("Unknown model type.")
 
         out.append(x_next[:, None, :])
-        x_hist = torch.cat([x_hist[:, 1:, :], x_next[:, None, :]], dim=1)
+        x_hist = torch.cat([x_hist, x_next[:, None, :]], dim=1)
+        x_hist = crop_history_window(x_hist, context_len)
 
     return torch.cat(out, dim=1)  # [B,steps,D]
 
@@ -340,8 +524,63 @@ def _acf(x: np.ndarray, max_lag: int = 20) -> np.ndarray:
     return out
 
 
-def _microstructure_series(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray) -> Dict[str, np.ndarray]:
-    return microstructure_series(ask_p, ask_v, bid_p, bid_v)
+def _rolling_volatility(x: np.ndarray, window: int = 10) -> np.ndarray:
+    x = np.asarray(x, dtype=np.float64).ravel()
+    if x.size == 0:
+        return np.zeros(0, dtype=np.float64)
+    w = max(2, int(window))
+    out = np.zeros_like(x, dtype=np.float64)
+    for t in range(x.size):
+        s = max(0, t - w + 1)
+        out[t] = float(np.std(x[s : t + 1]))
+    return out
+
+
+def _normalized_mae(x: np.ndarray, y: np.ndarray) -> float:
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    n = min(x.size, y.size)
+    if n == 0:
+        return float("nan")
+    scale = float(np.std(y[:n]) + 1e-6)
+    return float(np.mean(np.abs(x[:n] - y[:n])) / scale)
+
+
+def _hist_l1(x: np.ndarray, y: np.ndarray, bins: int = 64) -> float:
+    x = np.asarray(x, dtype=np.float64).ravel()
+    y = np.asarray(y, dtype=np.float64).ravel()
+    if x.size == 0 or y.size == 0:
+        return float("nan")
+    lo = float(min(np.min(x), np.min(y)))
+    hi = float(max(np.max(x), np.max(y)))
+    if not np.isfinite(lo) or not np.isfinite(hi):
+        return float("nan")
+    if hi <= lo:
+        return 0.0
+    edges = np.linspace(lo, hi, int(bins) + 1, dtype=np.float64)
+    hx, _ = np.histogram(x, bins=edges)
+    hy, _ = np.histogram(y, bins=edges)
+    px = hx.astype(np.float64) / max(1.0, float(hx.sum()))
+    py = hy.astype(np.float64) / max(1.0, float(hy.sum()))
+    return float(np.sum(np.abs(px - py)))
+
+
+def _impact_response_curve(imb: np.ndarray, ret: np.ndarray, lags: Sequence[int] = (1, 5, 10, 20)) -> Dict[str, float]:
+    imb = np.asarray(imb, dtype=np.float64).ravel()
+    ret = np.asarray(ret, dtype=np.float64).ravel()
+    out: Dict[str, float] = {}
+    if imb.size == 0 or ret.size == 0:
+        return {str(int(lag)): float("nan") for lag in lags}
+    ret_csum = np.concatenate(([0.0], np.cumsum(ret, dtype=np.float64)))
+    for lag in lags:
+        hh = int(lag)
+        if hh <= 0 or ret.size <= hh:
+            out[str(hh)] = float("nan")
+            continue
+        future_ret = ret_csum[1 + hh :] - ret_csum[1 : ret.size - hh + 1]
+        drive = imb[: ret.size - hh]
+        out[str(hh)] = float(np.mean(drive * future_ret))
+    return out
 
 
 def _validity_metrics(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, bid_v: np.ndarray) -> Dict[str, float]:
@@ -357,6 +596,407 @@ def _validity_metrics(ask_p: np.ndarray, ask_v: np.ndarray, bid_p: np.ndarray, b
         "ask_monotonic_violation_rate": float(ask_monotonic_bad.mean()),
         "bid_monotonic_violation_rate": float(bid_monotonic_bad.mean()),
         "nonpositive_volume_rate": float(nonpos_vol.mean()),
+    }
+
+
+class _SmallMLP(torch.nn.Module):
+    def __init__(self, input_dim: int, output_dim: int, hidden_dim: int = 64):
+        super().__init__()
+        self.net = torch.nn.Sequential(
+            torch.nn.Linear(int(input_dim), int(hidden_dim)),
+            torch.nn.ReLU(),
+            torch.nn.Linear(int(hidden_dim), int(hidden_dim)),
+            torch.nn.ReLU(),
+            torch.nn.Linear(int(hidden_dim), int(output_dim)),
+        )
+
+    def forward(self, x: torch.Tensor) -> torch.Tensor:
+        return self.net(x)
+
+
+def _downstream_device(cfg: LOBConfig) -> torch.device:
+    device = getattr(cfg, "device", torch.device("cpu"))
+    if isinstance(device, str):
+        return torch.device(device)
+    return device
+
+
+def _standardize_pair(train_x: np.ndarray, test_x: np.ndarray) -> Tuple[np.ndarray, np.ndarray]:
+    mu = train_x.mean(axis=0, keepdims=True).astype(np.float32)
+    sig = (train_x.std(axis=0, keepdims=True) + 1e-6).astype(np.float32)
+    return ((train_x - mu) / sig).astype(np.float32), ((test_x - mu) / sig).astype(np.float32)
+
+
+def _macro_f1_score(y_true: np.ndarray, y_pred: np.ndarray, num_classes: int) -> float:
+    y_true = np.asarray(y_true, dtype=np.int64).ravel()
+    y_pred = np.asarray(y_pred, dtype=np.int64).ravel()
+    if y_true.size == 0:
+        return float("nan")
+
+    f1s = []
+    for cls in range(int(num_classes)):
+        tp = float(np.sum((y_true == cls) & (y_pred == cls)))
+        fp = float(np.sum((y_true != cls) & (y_pred == cls)))
+        fn = float(np.sum((y_true == cls) & (y_pred != cls)))
+        denom = 2.0 * tp + fp + fn
+        f1s.append(0.0 if denom <= 0 else (2.0 * tp) / denom)
+    return float(np.mean(f1s))
+
+
+def _binary_auc(y_true: np.ndarray, scores: np.ndarray) -> float:
+    y_true = np.asarray(y_true, dtype=np.int64).ravel()
+    scores = np.asarray(scores, dtype=np.float64).ravel()
+    n_pos = int(np.sum(y_true == 1))
+    n_neg = int(np.sum(y_true == 0))
+    if n_pos == 0 or n_neg == 0:
+        return float("nan")
+    order = np.argsort(scores, kind="mergesort")
+    ranks = np.empty_like(order, dtype=np.float64)
+    ranks[order] = np.arange(1, len(scores) + 1, dtype=np.float64)
+    pos_rank_sum = float(ranks[y_true == 1].sum())
+    auc = (pos_rank_sum - n_pos * (n_pos + 1) / 2.0) / float(n_pos * n_neg)
+    return float(auc)
+
+
+def _train_small_multiclass_mlp(
+    train_x: np.ndarray,
+    train_y: np.ndarray,
+    test_x: np.ndarray,
+    test_y: np.ndarray,
+    *,
+    device: torch.device,
+    seed: int,
+    hidden_dim: int = 64,
+    epochs: int = 12,
+    batch_size: int = 512,
+) -> float:
+    train_x = np.asarray(train_x, dtype=np.float32)
+    train_y = np.asarray(train_y, dtype=np.int64)
+    test_x = np.asarray(test_x, dtype=np.float32)
+    test_y = np.asarray(test_y, dtype=np.int64)
+    if len(train_x) == 0 or len(test_x) == 0:
+        return float("nan")
+    if np.unique(train_y).size < 2 or np.unique(test_y).size < 2:
+        return float("nan")
+
+    torch.manual_seed(seed)
+    model = _SmallMLP(train_x.shape[1], 3, hidden_dim=hidden_dim).to(device)
+    counts = np.bincount(train_y, minlength=3).astype(np.float32)
+    weights = np.where(counts > 0, counts.sum() / np.maximum(counts, 1.0), 0.0)
+    loss_fn = torch.nn.CrossEntropyLoss(weight=torch.tensor(weights, device=device))
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+
+    x_train = torch.from_numpy(train_x).to(device)
+    y_train = torch.from_numpy(train_y).to(device)
+    x_test = torch.from_numpy(test_x).to(device)
+
+    for _ in range(int(epochs)):
+        perm = torch.randperm(x_train.shape[0], device=device)
+        for start in range(0, x_train.shape[0], int(batch_size)):
+            idx = perm[start : start + int(batch_size)]
+            logits = model(x_train.index_select(0, idx))
+            loss = loss_fn(logits, y_train.index_select(0, idx))
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step()
+
+    model.eval()
+    with torch.no_grad():
+        pred = model(x_test).argmax(dim=1).cpu().numpy()
+    return _macro_f1_score(test_y, pred, num_classes=3)
+
+
+def _train_small_discriminator_auc(
+    train_x: np.ndarray,
+    train_y: np.ndarray,
+    test_x: np.ndarray,
+    test_y: np.ndarray,
+    *,
+    device: torch.device,
+    seed: int,
+    hidden_dim: int = 64,
+    epochs: int = 10,
+    batch_size: int = 512,
+) -> float:
+    train_x = np.asarray(train_x, dtype=np.float32)
+    train_y = np.asarray(train_y, dtype=np.float32)
+    test_x = np.asarray(test_x, dtype=np.float32)
+    test_y = np.asarray(test_y, dtype=np.int64)
+    if len(train_x) == 0 or len(test_x) == 0:
+        return float("nan")
+    if np.unique(train_y).size < 2 or np.unique(test_y).size < 2:
+        return float("nan")
+
+    torch.manual_seed(seed)
+    model = _SmallMLP(train_x.shape[1], 1, hidden_dim=hidden_dim).to(device)
+    loss_fn = torch.nn.BCEWithLogitsLoss()
+    opt = torch.optim.Adam(model.parameters(), lr=1e-3, weight_decay=1e-4)
+
+    x_train = torch.from_numpy(train_x).to(device)
+    y_train = torch.from_numpy(train_y[:, None]).to(device)
+    x_test = torch.from_numpy(test_x).to(device)
+
+    for _ in range(int(epochs)):
+        perm = torch.randperm(x_train.shape[0], device=device)
+        for start in range(0, x_train.shape[0], int(batch_size)):
+            idx = perm[start : start + int(batch_size)]
+            logits = model(x_train.index_select(0, idx))
+            loss = loss_fn(logits, y_train.index_select(0, idx))
+            opt.zero_grad(set_to_none=True)
+            loss.backward()
+            opt.step()
+
+    model.eval()
+    with torch.no_grad():
+        probs = torch.sigmoid(model(x_test)).squeeze(1).cpu().numpy()
+    return _binary_auc(test_y, probs)
+
+
+def _future_moves_from_params(params_raw: np.ndarray, label_horizon: int) -> Tuple[np.ndarray, np.ndarray]:
+    params_raw = np.asarray(params_raw, dtype=np.float32)
+    T = int(len(params_raw))
+    hh = int(label_horizon)
+    if hh <= 0 or T <= hh:
+        return np.zeros((0, params_raw.shape[1]), dtype=np.float32), np.zeros(0, dtype=np.float32)
+
+    delta_mid = params_raw[:, 0].astype(np.float64)
+    csum = np.concatenate(([0.0], np.cumsum(delta_mid, dtype=np.float64)))
+    idx = np.arange(0, T - hh, dtype=np.int64)
+    moves = csum[idx + hh + 1] - csum[idx + 1]
+    feats = params_raw[: T - hh].astype(np.float32)
+    return feats, moves.astype(np.float32)
+
+
+def _ternary_labels(moves: np.ndarray, threshold: float) -> np.ndarray:
+    moves = np.asarray(moves, dtype=np.float32)
+    thr = float(max(threshold, 1e-8))
+    labels = np.full(moves.shape, 1, dtype=np.int64)
+    labels[moves > thr] = 2
+    labels[moves < -thr] = 0
+    return labels
+
+
+def _subsample_examples(x: np.ndarray, y: np.ndarray, max_examples: int, seed: int) -> Tuple[np.ndarray, np.ndarray]:
+    if len(x) <= int(max_examples):
+        return x, y
+    rng = np.random.default_rng(seed)
+    idx = rng.choice(len(x), size=int(max_examples), replace=False)
+    return x[idx], y[idx]
+
+
+def _collect_downstream_examples(
+    rows: Sequence[Dict[str, Any]],
+    *,
+    label_horizon: int,
+    max_examples_per_split: int,
+    seed: int,
+) -> Dict[str, np.ndarray]:
+    real_x = []
+    real_moves = []
+    gen_x = []
+    gen_moves = []
+
+    for row in rows:
+        seq = row["seq"]
+        gx, gm = _future_moves_from_params(seq["gen_params_raw"], label_horizon)
+        rx, rm = _future_moves_from_params(seq["true_params_raw"], label_horizon)
+        if len(gx) == 0 or len(rx) == 0:
+            continue
+        gen_x.append(gx)
+        gen_moves.append(gm)
+        real_x.append(rx)
+        real_moves.append(rm)
+
+    if not real_x or not gen_x:
+        empty_x = np.zeros((0, 1), dtype=np.float32)
+        empty_y = np.zeros(0, dtype=np.float32)
+        return {
+            "real_x": empty_x,
+            "real_moves": empty_y,
+            "gen_x": empty_x,
+            "gen_moves": empty_y,
+        }
+
+    real_x_arr = np.concatenate(real_x, axis=0).astype(np.float32)
+    real_moves_arr = np.concatenate(real_moves, axis=0).astype(np.float32)
+    gen_x_arr = np.concatenate(gen_x, axis=0).astype(np.float32)
+    gen_moves_arr = np.concatenate(gen_moves, axis=0).astype(np.float32)
+
+    real_x_arr, real_moves_arr = _subsample_examples(real_x_arr, real_moves_arr, max_examples_per_split, seed + 1)
+    gen_x_arr, gen_moves_arr = _subsample_examples(gen_x_arr, gen_moves_arr, max_examples_per_split, seed + 2)
+    return {
+        "real_x": real_x_arr,
+        "real_moves": real_moves_arr,
+        "gen_x": gen_x_arr,
+        "gen_moves": gen_moves_arr,
+    }
+
+
+def _pairwise_split(
+    real_x: np.ndarray,
+    gen_x: np.ndarray,
+    *,
+    seed: int,
+    train_frac: float = 0.7,
+) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    n = int(min(len(real_x), len(gen_x)))
+    if n <= 1:
+        empty = np.zeros((0, real_x.shape[1] if real_x.ndim == 2 else gen_x.shape[1]), dtype=np.float32)
+        return empty, np.zeros(0, dtype=np.int64), empty, np.zeros(0, dtype=np.int64)
+    rng = np.random.default_rng(seed)
+    idx = rng.permutation(n)
+    n_train = max(1, int(round(n * train_frac)))
+    n_train = min(n_train, n - 1)
+    tr = idx[:n_train]
+    te = idx[n_train:]
+    train_x = np.concatenate([real_x[tr], gen_x[tr]], axis=0).astype(np.float32)
+    train_y = np.concatenate([np.ones(len(tr), dtype=np.int64), np.zeros(len(tr), dtype=np.int64)], axis=0)
+    test_x = np.concatenate([real_x[te], gen_x[te]], axis=0).astype(np.float32)
+    test_y = np.concatenate([np.ones(len(te), dtype=np.int64), np.zeros(len(te), dtype=np.int64)], axis=0)
+    return train_x, train_y, test_x, test_y
+
+
+def _aggregate_core_l2_distribution_metrics(rows: Sequence[Dict[str, Any]]) -> Dict[str, Any]:
+    pooled_gen = {k: [] for k in CORE_L2_STATS}
+    pooled_true = {k: [] for k in CORE_L2_STATS}
+    per_window = {k: [] for k in CORE_L2_STATS}
+    per_window_l1 = {k: [] for k in CORE_L2_STATS}
+
+    for row in rows:
+        seq = row["seq"]
+        sg = microstructure_series(
+            seq["gen"]["ask_p"], seq["gen"]["ask_v"], seq["gen"]["bid_p"], seq["gen"]["bid_v"]
+        )
+        st = microstructure_series(
+            seq["true"]["ask_p"], seq["true"]["ask_v"], seq["true"]["bid_p"], seq["true"]["bid_v"]
+        )
+        for key in CORE_L2_STATS:
+            sg_arr = np.asarray(sg[key], dtype=np.float64)
+            st_arr = np.asarray(st[key], dtype=np.float64)
+            pooled_gen[key].append(sg_arr)
+            pooled_true[key].append(st_arr)
+            per_window[key].append(_wasserstein_1d(sg[key], st[key]))
+            per_window_l1[key].append(_normalized_mae(sg_arr, st_arr))
+
+    unconditional_by_stat = {}
+    conditional_by_stat = {}
+    unconditional_l1_by_stat = {}
+    conditional_l1_by_stat = {}
+    stat_scales = {}
+    for key in CORE_L2_STATS:
+        pooled_true_arr = np.concatenate(pooled_true[key], axis=0)
+        pooled_gen_arr = np.concatenate(pooled_gen[key], axis=0)
+        scale = float(np.std(pooled_true_arr) + 1e-6)
+        stat_scales[key] = scale
+        x_norm = (pooled_gen_arr - float(np.mean(pooled_true_arr))) / scale
+        y_norm = (pooled_true_arr - float(np.mean(pooled_true_arr))) / scale
+        unconditional_by_stat[key] = _wasserstein_1d(
+            pooled_gen_arr,
+            pooled_true_arr,
+        ) / scale
+        unconditional_l1_by_stat[key] = _hist_l1(x_norm, y_norm)
+        conditional_by_stat[key] = float(np.mean(per_window[key]) / scale)
+        conditional_l1_by_stat[key] = float(np.mean(per_window_l1[key]))
+
+    unconditional = float(np.mean(list(unconditional_by_stat.values())))
+    conditional = float(np.mean(list(conditional_by_stat.values())))
+    u_l1 = float(np.mean(list(unconditional_l1_by_stat.values())))
+    c_l1 = float(np.mean(list(conditional_l1_by_stat.values())))
+    return {
+        "unconditional_w1": unconditional,
+        "conditional_w1": conditional,
+        "u_l1": u_l1,
+        "c_l1": c_l1,
+        "unconditional_w1_by_stat": unconditional_by_stat,
+        "conditional_w1_by_stat": conditional_by_stat,
+        "unconditional_l1_by_stat": unconditional_l1_by_stat,
+        "conditional_l1_by_stat": conditional_l1_by_stat,
+        "stat_scales": stat_scales,
+    }
+
+
+def _evaluate_generation_main_metrics(
+    rows: Sequence[Dict[str, Any]],
+    cfg: LOBConfig,
+    *,
+    horizon: int,
+    seed: int,
+    max_examples_per_split: int = 20_000,
+) -> Dict[str, Any]:
+    label_horizon = int(max(1, min(10, max(1, horizon // 10))))
+    downstream = _collect_downstream_examples(
+        rows,
+        label_horizon=label_horizon,
+        max_examples_per_split=max_examples_per_split,
+        seed=seed,
+    )
+    device = _downstream_device(cfg)
+
+    real_x = downstream["real_x"]
+    real_moves = downstream["real_moves"]
+    gen_x = downstream["gen_x"]
+    gen_moves = downstream["gen_moves"]
+
+    threshold = float(np.quantile(np.abs(real_moves), 1.0 / 3.0)) if len(real_moves) > 0 else float("nan")
+    real_y = _ternary_labels(real_moves, threshold) if np.isfinite(threshold) else np.zeros(0, dtype=np.int64)
+    gen_y = _ternary_labels(gen_moves, threshold) if np.isfinite(threshold) else np.zeros(0, dtype=np.int64)
+
+    tstr_macro_f1 = float("nan")
+    if len(gen_x) > 0 and len(real_x) > 0 and np.unique(gen_y).size >= 2 and np.unique(real_y).size >= 2:
+        x_train, x_test = _standardize_pair(gen_x, real_x)
+        tstr_macro_f1 = _train_small_multiclass_mlp(
+            x_train,
+            gen_y,
+            x_test,
+            real_y,
+            device=device,
+            seed=seed + 31,
+        )
+
+    disc_auc = float("nan")
+    if len(gen_x) > 1 and len(real_x) > 1:
+        train_x, train_y, test_x, test_y = _pairwise_split(real_x, gen_x, seed=seed + 17)
+        if len(train_x) > 0 and len(test_x) > 0:
+            train_x, test_x = _standardize_pair(train_x, test_x)
+            disc_auc = _train_small_discriminator_auc(
+                train_x,
+                train_y.astype(np.float32),
+                test_x,
+                test_y,
+                device=device,
+                seed=seed + 47,
+            )
+    disc_auc_gap = float(abs(disc_auc - 0.5)) if np.isfinite(disc_auc) else float("nan")
+
+    w1_metrics = _aggregate_core_l2_distribution_metrics(rows)
+
+    score_terms = [
+        1.0 - tstr_macro_f1 if np.isfinite(tstr_macro_f1) else np.nan,
+        disc_auc_gap,
+        np.log1p(w1_metrics["unconditional_w1"]) if np.isfinite(w1_metrics["unconditional_w1"]) else np.nan,
+        np.log1p(w1_metrics["conditional_w1"]) if np.isfinite(w1_metrics["conditional_w1"]) else np.nan,
+    ]
+    finite_terms = np.asarray([term for term in score_terms if np.isfinite(term)], dtype=np.float64)
+    score_main = float(finite_terms.mean()) if finite_terms.size > 0 else float("nan")
+
+    return {
+        "tstr_macro_f1": float(tstr_macro_f1),
+        "disc_auc": float(disc_auc),
+        "disc_auc_gap": float(disc_auc_gap),
+        "unconditional_w1": float(w1_metrics["unconditional_w1"]),
+        "conditional_w1": float(w1_metrics["conditional_w1"]),
+        "u_l1": float(w1_metrics["u_l1"]),
+        "c_l1": float(w1_metrics["c_l1"]),
+        "unconditional_w1_by_stat": w1_metrics["unconditional_w1_by_stat"],
+        "conditional_w1_by_stat": w1_metrics["conditional_w1_by_stat"],
+        "unconditional_l1_by_stat": w1_metrics["unconditional_l1_by_stat"],
+        "conditional_l1_by_stat": w1_metrics["conditional_l1_by_stat"],
+        "stat_scales": w1_metrics["stat_scales"],
+        "score_main": float(score_main),
+        "label_horizon": int(label_horizon),
+        "n_examples_real": int(len(real_x)),
+        "n_examples_gen": int(len(gen_x)),
+        "threshold_abs_move": float(threshold) if np.isfinite(threshold) else float("nan"),
     }
 
 
@@ -398,8 +1038,10 @@ def compare_l2_sequences(
     gen_params = gen_params[:T]
     true_params = true_params[:T]
 
-    sg = _microstructure_series(ask_p_gen[:T], ask_v_gen[:T], bid_p_gen[:T], bid_v_gen[:T])
-    st = _microstructure_series(ask_p_true[:T], ask_v_true[:T], bid_p_true[:T], bid_v_true[:T])
+    sg = microstructure_series(ask_p_gen[:T], ask_v_gen[:T], bid_p_gen[:T], bid_v_gen[:T])
+    st = microstructure_series(ask_p_true[:T], ask_v_true[:T], bid_p_true[:T], bid_v_true[:T])
+    vol_g = _rolling_volatility(sg["ret"], window=10)
+    vol_t = _rolling_volatility(st["ret"], window=10)
 
     # Distribution fidelity
     dist = {}
@@ -418,6 +1060,10 @@ def compare_l2_sequences(
             "acf_l1": float(np.mean(np.abs(ag - at))),
             "acf_l2": float(np.sqrt(np.mean((ag - at) ** 2))),
         }
+    temporal["volatility"] = {
+        "acf_l1": float(np.mean(np.abs(_acf(vol_g, max_lag=max_acf_lag) - _acf(vol_t, max_lag=max_acf_lag)))),
+        "acf_l2": float(np.sqrt(np.mean((_acf(vol_g, max_lag=max_acf_lag) - _acf(vol_t, max_lag=max_acf_lag)) ** 2))),
+    }
 
     # Cross-level structure: volume correlation matrix similarity
     def _corr_mat(v: np.ndarray) -> np.ndarray:
@@ -444,6 +1090,22 @@ def compare_l2_sequences(
     }
 
     validity = _validity_metrics(ask_p_gen[:T], ask_v_gen[:T], bid_p_gen[:T], bid_v_gen[:T])
+    errors = {
+        "spread_mae": _normalized_mae(sg["spread"], st["spread"]),
+        "imbalance_mae": _normalized_mae(sg["imb"], st["imb"]),
+    }
+    response_g = _impact_response_curve(sg["imb"], sg["ret"])
+    response_t = _impact_response_curve(st["imb"], st["ret"])
+    response_err = []
+    for lag_key in response_t.keys():
+        if np.isfinite(response_g[lag_key]) and np.isfinite(response_t[lag_key]):
+            denom = max(abs(response_t[lag_key]), 1e-6)
+            response_err.append(abs(response_g[lag_key] - response_t[lag_key]) / denom)
+    microstructure = {
+        "impact_response_l1": float(np.mean(response_err)) if response_err else float("nan"),
+        "impact_response_curve_gen": response_g,
+        "impact_response_curve_true": response_t,
+    }
 
     # Compact scalar (lower is better) for Pareto plots
     score_main = (
@@ -461,6 +1123,8 @@ def compare_l2_sequences(
         "structure": structure,
         "params_fit": params_fit,
         "validity": validity,
+        "error": errors,
+        "microstructure": microstructure,
         "score_main": float(score_main),
         "basic_gen": compute_basic_l2_metrics(ask_p_gen[:T], ask_v_gen[:T], bid_p_gen[:T], bid_v_gen[:T]),
         "basic_true": compute_basic_l2_metrics(ask_p_true[:T], ask_v_true[:T], bid_p_true[:T], bid_v_true[:T]),
@@ -472,7 +1136,10 @@ def compare_l2_sequences(
 # -----------------------------
 def _valid_eval_indices(ds: WindowedLOBParamsDataset, horizon: int) -> np.ndarray:
     starts = np.asarray(ds.start_indices, dtype=np.int64)
-    return starts[starts + int(horizon) <= len(ds.params)]
+    if len(starts) == 0:
+        return starts
+    segment_ends = ds.segment_end_for_t(starts)
+    return starts[starts + int(horizon) <= segment_ends]
 
 
 def _denorm_params_seq(ds: WindowedLOBParamsDataset, x_norm: np.ndarray) -> np.ndarray:
@@ -495,13 +1162,11 @@ def eval_one_window(
     cfg: LOBConfig,
     horizon: int = 200,
     nfe: int = 1,
-    model_name: str = "lobiflow",
     seed: int = 0,
     t0: Optional[int] = None,
     horizons_eval: Sequence[int] = (1, 10, 50, 100, 200),
     return_sequences: bool = False,
 ) -> Dict[str, Any]:
-    _ = model_name
     horizon = int(horizon)
 
     if t0 is None:
@@ -514,6 +1179,7 @@ def eval_one_window(
     batch = _get_dataset_item_by_t(ds, t0)
     hist, _, _, _, meta = _parse_batch(batch)
     hist = hist[None, :, :].to(cfg.device).float()
+    context_len = resolve_context_length(hist.shape[1], horizon=horizon, cfg=cfg)
 
     cond_seq = None
     if ds.cond is not None:
@@ -558,6 +1224,7 @@ def eval_one_window(
         "horizon": horizon_metrics,
         "timing": {
             "latency_s_total": float(latency_s),
+            "latency_ms_per_sample": float(1000.0 * latency_s),
             "latency_ms_per_step": float(1000.0 * latency_s / max(1, horizon)),
             "throughput_steps_per_s": float(horizon / max(latency_s, 1e-12)),
             "nfe": int(nfe),
@@ -567,6 +1234,7 @@ def eval_one_window(
             "t": int(t0),
             "init_mid_for_window": float(meta["init_mid_for_window"]),
             "init_mid_prev": float(init_mid_prev),
+            "context_len": int(context_len),
         },
     }
 
@@ -590,6 +1258,10 @@ def _aggregate_nested_dicts(dicts):
             continue
         aggs[k] = _safe_mean_std(vals)
     return unflatten_to_nested(aggs)
+
+
+def _wrap_scalar_as_mean_std(value: float) -> Dict[str, float]:
+    return {"mean": float(value), "std": 0.0}
 
 
 @torch.no_grad()
@@ -622,40 +1294,62 @@ def eval_many_windows(
                 t0=int(t0),
                 seed=int(rng.integers(0, 1_000_000)),
                 horizons_eval=horizons_eval,
-                return_sequences=False,
+                return_sequences=True,
             )
         )
+
+    cmp = _aggregate_nested_dicts([r["cmp"] for r in rows])
+    timing = _aggregate_nested_dicts([r["timing"] for r in rows])
+    legacy_score_main = cmp.get("score_main")
+    with torch.enable_grad():
+        main_metrics = _evaluate_generation_main_metrics(rows, cfg, horizon=horizon, seed=seed)
+    cmp["main"] = {
+        "tstr_macro_f1": _wrap_scalar_as_mean_std(main_metrics["tstr_macro_f1"]),
+        "disc_auc": _wrap_scalar_as_mean_std(main_metrics["disc_auc"]),
+        "disc_auc_gap": _wrap_scalar_as_mean_std(main_metrics["disc_auc_gap"]),
+        "unconditional_w1": _wrap_scalar_as_mean_std(main_metrics["unconditional_w1"]),
+        "conditional_w1": _wrap_scalar_as_mean_std(main_metrics["conditional_w1"]),
+        "label_horizon": int(main_metrics["label_horizon"]),
+        "n_examples_real": int(main_metrics["n_examples_real"]),
+        "n_examples_gen": int(main_metrics["n_examples_gen"]),
+        "threshold_abs_move": _wrap_scalar_as_mean_std(main_metrics["threshold_abs_move"]),
+        "unconditional_w1_by_stat": {
+            key: _wrap_scalar_as_mean_std(val)
+            for key, val in main_metrics["unconditional_w1_by_stat"].items()
+        },
+        "conditional_w1_by_stat": {
+            key: _wrap_scalar_as_mean_std(val)
+            for key, val in main_metrics["conditional_w1_by_stat"].items()
+        },
+        "stat_scales": {
+            key: _wrap_scalar_as_mean_std(val)
+            for key, val in main_metrics["stat_scales"].items()
+        },
+    }
+    ret_acf = cmp.get("temporal", {}).get("ret", {}).get("acf_l1", {}).get("mean")
+    vol_acf = cmp.get("temporal", {}).get("volatility", {}).get("acf_l1", {}).get("mean")
+    ret_vol_terms = [v for v in (ret_acf, vol_acf) if isinstance(v, (int, float)) and np.isfinite(v)]
+    cmp["extra"] = {
+        "u_l1": _wrap_scalar_as_mean_std(main_metrics["u_l1"]),
+        "c_l1": _wrap_scalar_as_mean_std(main_metrics["c_l1"]),
+        "spread_specific_error": cmp.get("error", {}).get("spread_mae", _wrap_scalar_as_mean_std(float("nan"))),
+        "imbalance_specific_error": cmp.get("error", {}).get("imbalance_mae", _wrap_scalar_as_mean_std(float("nan"))),
+        "ret_vol_acf_error": _wrap_scalar_as_mean_std(float(np.mean(ret_vol_terms)) if ret_vol_terms else float("nan")),
+        "impact_response_error": cmp.get("microstructure", {}).get("impact_response_l1", _wrap_scalar_as_mean_std(float("nan"))),
+        "efficiency_ms_per_sample": timing.get("latency_ms_per_sample", _wrap_scalar_as_mean_std(float("nan"))),
+    }
+    if legacy_score_main is not None:
+        cmp["legacy_score_main"] = legacy_score_main
+    cmp["score_main"] = _wrap_scalar_as_mean_std(main_metrics["score_main"])
 
     return {
         "gen": _aggregate_nested_dicts([r["gen"] for r in rows]),
         "true": _aggregate_nested_dicts([r["true"] for r in rows]),
-        "cmp": _aggregate_nested_dicts([r["cmp"] for r in rows]),
+        "cmp": cmp,
         "horizon": _aggregate_nested_dicts([r["horizon"] for r in rows]),
-        "timing": _aggregate_nested_dicts([r["timing"] for r in rows]),
+        "timing": timing,
         "meta": {"n_windows": int(len(rows)), "nfe": int(nfe), "horizon": int(horizon)},
     }
-
-
-@torch.no_grad()
-def eval_many_windows_nfe(
-    ds: WindowedLOBParamsDataset,
-    model: torch.nn.Module,
-    cfg: LOBConfig,
-    nfe_list: List[int],
-    horizon: int = 200,
-    n_windows: int = 50,
-    seed: int = 0,
-    horizons_eval: Sequence[int] = (1, 10, 50, 100, 200),
-) -> Dict[int, Dict[str, Any]]:
-    results = {}
-    for nfe in nfe_list:
-        results[int(nfe)] = eval_many_windows(
-            ds, model, cfg,
-            horizon=horizon, nfe=int(nfe),
-            n_windows=n_windows, seed=seed,
-            horizons_eval=horizons_eval,
-        )
-    return results
 
 
 @torch.no_grad()
@@ -696,6 +1390,7 @@ def benchmark_sampling_latency(
 
     hist, _, _, _, _ = _parse_batch(_get_dataset_item_by_t(ds, t0))
     hist = hist[None].to(cfg.device).float()
+    context_len = resolve_context_length(hist.shape[1], horizon=horizon, cfg=cfg)
 
     cond_seq = None
     if ds.cond is not None:
@@ -717,12 +1412,14 @@ def benchmark_sampling_latency(
     return {
         "latency_s_mean": float(arr.mean()),
         "latency_s_std": float(arr.std()),
+        "latency_ms_per_sample_mean": float(1000.0 * arr.mean()),
         "latency_ms_per_step_mean": float(1000.0 * arr.mean() / max(1, horizon)),
         "throughput_steps_per_s_mean": float(horizon / max(arr.mean(), 1e-12)),
         "n_trials": int(n_trials),
         "warmup": int(warmup),
         "nfe": int(nfe),
         "horizon": int(horizon),
+        "context_len": int(context_len),
     }
 
 
@@ -749,13 +1446,9 @@ def eval_speed_quality_nfe(
 # Ablations (C)
 # -----------------------------
 def clone_cfg_with_overrides(cfg: LOBConfig, overrides: Dict[str, Any]) -> LOBConfig:
-    try:
-        return replace(cfg, **overrides)
-    except Exception:
-        cfg2 = copy.deepcopy(cfg)
-        for k, v in overrides.items():
-            setattr(cfg2, k, v)
-        return cfg2
+    cfg2 = copy.deepcopy(cfg)
+    cfg2.apply_overrides(**overrides)
+    return cfg2
 
 
 def run_ablation_grid(
@@ -774,12 +1467,13 @@ def run_ablation_grid(
 ) -> Dict[str, Any]:
     rng = np.random.default_rng(seed)
     suite = {}
+    model_name = _normalize_model_name(model_name)
 
     for name, overrides in ablations:
         cfg_i = clone_cfg_with_overrides(base_cfg, dict(overrides))
         print(f"\n=== Ablation: {name} | overrides={overrides} ===")
 
-        if model_name.lower() in ("biflow_nf", "nf") and stage2_steps_nf is not None:
+        if model_name == "biflow_nf" and stage2_steps_nf is not None:
             model = train_biflow_nf_two_stage(ds_train, cfg_i, stage1_steps=train_steps, stage2_steps=stage2_steps_nf, log_every=log_every)
         else:
             model = train_loop(ds_train, cfg_i, model_name=model_name, steps=train_steps, log_every=log_every)
@@ -803,10 +1497,17 @@ def summarize_ablation_for_table(
     ablation_results: Dict[str, Any],
     keys: Sequence[str] = (
         "eval.cmp.score_main.mean",
-        "eval.cmp.params_fit.params_rmse.mean",
-        "eval.cmp.temporal.ret.acf_l1.mean",
-        "eval.cmp.validity.valid_rate.mean",
-        "eval.timing.latency_ms_per_step.mean",
+        "eval.cmp.main.tstr_macro_f1.mean",
+        "eval.cmp.main.disc_auc_gap.mean",
+        "eval.cmp.main.unconditional_w1.mean",
+        "eval.cmp.main.conditional_w1.mean",
+        "eval.cmp.extra.u_l1.mean",
+        "eval.cmp.extra.c_l1.mean",
+        "eval.cmp.extra.spread_specific_error.mean",
+        "eval.cmp.extra.imbalance_specific_error.mean",
+        "eval.cmp.extra.ret_vol_acf_error.mean",
+        "eval.cmp.extra.impact_response_error.mean",
+        "eval.cmp.extra.efficiency_ms_per_sample.mean",
     ),
 ):
     rows = []
@@ -870,12 +1571,14 @@ def save_json(obj: Dict[str, Any], path: str):
 
 __all__ = [
     "seed_all",
+    "resolve_context_length",
+    "crop_history_window",
+    "sample_training_context_length",
     "train_loop",
     "train_biflow_nf_two_stage",
     "generate_continuation",
     "eval_one_window",
     "eval_many_windows",
-    "eval_many_windows_nfe",
     "eval_rollout_horizons",
     "benchmark_sampling_latency",
     "eval_speed_quality_nfe",

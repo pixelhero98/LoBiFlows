@@ -33,6 +33,8 @@ _config = importlib.import_module(f"{_PKG}.config")
 _modules = importlib.import_module(f"{_PKG}.modules")
 _conditioning = importlib.import_module(f"{_PKG}.conditioning")
 _baselines = importlib.import_module(f"{_PKG}.baselines")
+_deepmarket_baselines = importlib.import_module(f"{_PKG}.deepmarket_baselines")
+_temporal_baselines = importlib.import_module(f"{_PKG}.temporal_baselines")
 
 LOBDataConfig = _config.LOBDataConfig
 SharedModelConfig = _config.SharedModelConfig
@@ -49,7 +51,6 @@ build_mlp = _modules.build_mlp
 AdaLN = _modules.AdaLN
 TransformerFUBlock = _modules.TransformerFUBlock
 TransformerFUNet = _modules.TransformerFUNet
-FiLMModulation = _modules.FiLMModulation
 EMAModel = _modules.EMAModel
 
 CondEmbedder = _conditioning.CondEmbedder
@@ -61,6 +62,11 @@ RectifiedFlowLOB = _baselines.RectifiedFlowLOB
 BiFlowLOB = _baselines.BiFlowLOB
 BiFlowNFBaseline = _baselines.BiFlowNFBaseline
 BiFlowNFLOB = _baselines.BiFlowNFLOB
+DeepMarketCGANBaseline = _deepmarket_baselines.DeepMarketCGANBaseline
+DeepMarketTRADESBaseline = _deepmarket_baselines.DeepMarketTRADESBaseline
+TimeCausalVAEBaseline = _temporal_baselines.TimeCausalVAEBaseline
+TimeGANBaseline = _temporal_baselines.TimeGANBaseline
+KoVAEBaseline = _temporal_baselines.KoVAEBaseline
 
 __all__ = [
     "LOBDataConfig",
@@ -77,7 +83,6 @@ __all__ = [
     "AdaLN",
     "TransformerFUBlock",
     "TransformerFUNet",
-    "FiLMModulation",
     "EMAModel",
     "CondEmbedder",
     "build_context_encoder",
@@ -87,4 +92,9 @@ __all__ = [
     "BiFlowLOB",
     "BiFlowNFBaseline",
     "BiFlowNFLOB",
+    "DeepMarketCGANBaseline",
+    "DeepMarketTRADESBaseline",
+    "TimeCausalVAEBaseline",
+    "TimeGANBaseline",
+    "KoVAEBaseline",
 ]

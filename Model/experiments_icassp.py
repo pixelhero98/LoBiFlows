@@ -1,20 +1,12 @@
 #!/usr/bin/env python3
-"""experiments_icassp.py
-
-End-to-end experiment runner for LoBiFlows-style LOB generation.
+"""LoBiFlow-only ICASSP experiment runner.
 
 Produces:
-A) Main quantitative evaluation (real-vs-real metrics) JSON
+A) Main quantitative evaluation JSON
 B) Speed-quality NFE sweep JSON + figure
-C) Ablation study JSON + compact summary JSON (default: LoBiFlow)
+C) Lightweight LoBiFlow ablation JSON + summary
 D) Rollout stability JSON + figure
 + qualitative window NPZ + figure
-
-Expected local modules:
-- lob_baselines.py
-- lob_datasets.py  (patched split-aware version)
-- lob_train_val.py (patched eval/benchmark version)
-- lob_viz_results.py
 """
 
 from __future__ import annotations
@@ -23,21 +15,24 @@ import argparse
 import json
 import os
 import time
-from typing import Any, Dict, List, Sequence
+from typing import Any, Dict, List
 
-import numpy as np
+import torch
 
 from lob_baselines import LOBConfig
-from lob_utils import flatten_dict as _flatten
-from lob_datasets import (
-    build_dataset_splits_from_fi2010,
-    build_dataset_splits_from_npz_l2,
-    build_dataset_splits_synthetic,
+from experiment_common import (
+    DATASET_CHOICES,
+    DEFAULT_SYNTHETIC_LENGTH,
+    apply_lobiflow_dataset_preset,
+    build_cfg_from_args,
+    build_dataset_splits,
+    mkdir,
+    parse_int_list,
 )
+from lob_utils import flatten_dict as _flatten
 from lob_train_val import (
     seed_all,
     train_loop,
-    train_biflow_nf_two_stage,
     eval_many_windows,
     eval_speed_quality_nfe,
     eval_rollout_horizons,
@@ -56,142 +51,22 @@ except Exception as _e:
     _VIZ_IMPORT_ERR = str(_e)
 
 
-# -----------------------------
-# Utilities
-# -----------------------------
-def _mkdir(p: str):
-    os.makedirs(p, exist_ok=True)
-
-
-def _parse_int_list(s: str) -> List[int]:
-    if not s:
-        return []
-    return [int(x.strip()) for x in s.split(",") if x.strip()]
-
-
-def _parse_str_list(s: str) -> List[str]:
-    if not s:
-        return []
-    return [x.strip() for x in s.split(",") if x.strip()]
-
-
-def _apply_cfg_overrides(cfg: LOBConfig, overrides: Dict[str, Any]) -> None:
-    """Apply flat overrides and fail fast for unknown keys."""
-    cleaned = {k: v for k, v in overrides.items() if v is not None}
-    if cleaned:
-        cfg.apply_overrides(**cleaned)
-
-
-def _make_cfg_from_args(args: argparse.Namespace) -> LOBConfig:
-    """Instantiate LOBConfig and apply CLI overrides."""
-    cfg = LOBConfig()
-
-    import torch as _torch
-
-    common_overrides = {
-        "device": _torch.device(args.device),
-        "levels": args.levels,
-        "history_len": args.history_len,
-        "batch_size": args.batch_size,
-        "lr": args.lr,
-        "weight_decay": args.weight_decay,
-        "grad_clip": args.grad_clip,
-        "standardize": args.standardize,
-        "use_cond_features": args.use_cond_features,
-        "cond_standardize": args.cond_standardize,
-    }
-    _apply_cfg_overrides(cfg, common_overrides)
-
-    optional_overrides = {
-        "hidden_dim": args.hidden_dim,
-        "ctx_encoder": args.ctx_encoder,
-        "film_conditioning": args.film_conditioning,
-        "lobiflow_profile": args.lobiflow_profile,
-        "lambda_consistency": args.lambda_consistency,
-        "lambda_imbalance": args.lambda_imbalance,
-        "use_minibatch_ot": args.use_minibatch_ot,
-        "use_pair_regularizer": args.use_pair_regularizer,
-        "cfg_scale": args.cfg_scale,
-        "cond_depths": tuple(_parse_int_list(args.cond_depths)) if args.cond_depths else None,
-        "cond_vol_window": args.cond_vol_window,
-    }
-    _apply_cfg_overrides(cfg, optional_overrides)
-
-    return cfg
-
-
-def _build_splits(args: argparse.Namespace, cfg: LOBConfig):
-    if args.dataset == "fi2010":
-        if not args.data_path:
-            raise ValueError("--data_path is required when --dataset fi2010")
-        splits = build_dataset_splits_from_fi2010(
-            path=args.data_path,
-            cfg=cfg,
-            layout=args.layout,
-            stride_train=args.stride_train,
-            stride_eval=args.stride_eval,
-            train_frac=args.train_frac,
-            val_frac=args.val_frac,
-            test_frac=args.test_frac,
-        )
-    elif args.dataset == "npz_l2":
-        if not args.data_path:
-            raise ValueError("--data_path is required when --dataset npz_l2 (prepared NPZ)")
-        splits = build_dataset_splits_from_npz_l2(
-            path=args.data_path,
-            cfg=cfg,
-            stride_train=args.stride_train,
-            stride_eval=args.stride_eval,
-            train_frac=args.train_frac,
-            val_frac=args.val_frac,
-            test_frac=args.test_frac,
-        )
-    elif args.dataset == "synthetic":
-        splits = build_dataset_splits_synthetic(
-            cfg=cfg,
-            length=args.synthetic_length,
-            seed=args.seed,
-            stride_train=args.stride_train,
-            stride_eval=args.stride_eval,
-            train_frac=args.train_frac,
-            val_frac=args.val_frac,
-            test_frac=args.test_frac,
-        )
-    else:
-        raise ValueError(f"Unknown dataset={args.dataset}")
-
-    return splits
-
-
-def _train_method(method: str, ds_train, cfg: LOBConfig, args: argparse.Namespace):
-    method = method.lower()
-    if method in ("biflow_nf", "nf"):
-        return train_biflow_nf_two_stage(
-            ds_train,
-            cfg,
-            stage1_steps=args.steps_nf_stage1,
-            stage2_steps=args.steps_nf_stage2,
-            log_every=args.log_every,
-        )
-    return train_loop(
-        ds_train,
-        cfg,
-        model_name=method,
-        steps=args.steps,
-        log_every=args.log_every,
-    )
-
-
-def _metric_summary_row(method: str, resA: Dict[str, Any]) -> Dict[str, Any]:
+def _metric_summary_row(resA: Dict[str, Any]) -> Dict[str, Any]:
     f = _flatten(resA)
     return {
-        "method": method,
+        "model": "lobiflow",
         "score_main": f.get("cmp.score_main.mean"),
-        "params_rmse": f.get("cmp.params_fit.params_rmse.mean"),
-        "ret_w1": f.get("cmp.dist.ret.w1.mean"),
-        "ret_acf_l1": f.get("cmp.temporal.ret.acf_l1.mean"),
-        "valid_rate": f.get("cmp.validity.valid_rate.mean"),
-        "lat_ms_step": f.get("timing.latency_ms_per_step.mean"),
+        "tstr_macro_f1": f.get("cmp.main.tstr_macro_f1.mean"),
+        "disc_auc_gap": f.get("cmp.main.disc_auc_gap.mean"),
+        "unconditional_w1": f.get("cmp.main.unconditional_w1.mean"),
+        "conditional_w1": f.get("cmp.main.conditional_w1.mean"),
+        "u_l1": f.get("cmp.extra.u_l1.mean"),
+        "c_l1": f.get("cmp.extra.c_l1.mean"),
+        "spread_specific_error": f.get("cmp.extra.spread_specific_error.mean"),
+        "imbalance_specific_error": f.get("cmp.extra.imbalance_specific_error.mean"),
+        "ret_vol_acf_error": f.get("cmp.extra.ret_vol_acf_error.mean"),
+        "impact_response_error": f.get("cmp.extra.impact_response_error.mean"),
+        "efficiency_ms_per_sample": f.get("cmp.extra.efficiency_ms_per_sample.mean"),
     }
 
 
@@ -201,7 +76,15 @@ def _print_compact_table(rows: List[Dict[str, Any]], title: str = "Main Results"
         print("(empty)")
         return
     rows = sorted(rows, key=lambda r: (float("inf") if r.get("score_main") is None else r["score_main"]))
-    headers = ["method", "score_main", "params_rmse", "ret_w1", "ret_acf_l1", "valid_rate", "lat_ms_step"]
+    headers = [
+        "model",
+        "score_main",
+        "tstr_macro_f1",
+        "disc_auc_gap",
+        "unconditional_w1",
+        "conditional_w1",
+        "efficiency_ms_per_sample",
+    ]
     print(" | ".join(headers))
     print("-" * 96)
     for r in rows:
@@ -221,11 +104,12 @@ def _print_compact_table(rows: List[Dict[str, Any]], title: str = "Main Results"
 def run_icassp_suite(args: argparse.Namespace):
     t_global_start = time.time()
     seed_all(args.seed)
+    args = apply_lobiflow_dataset_preset(args)
 
     out_root = args.out_dir
-    _mkdir(out_root)
+    mkdir(out_root)
 
-    cfg = _make_cfg_from_args(args)
+    cfg = build_cfg_from_args(args)
 
     # Persist config snapshot.
     cfg_dump = {
@@ -236,7 +120,7 @@ def run_icassp_suite(args: argparse.Namespace):
         json.dump(cfg_dump, f, indent=2)
 
     # Build splits
-    splits = _build_splits(args, cfg)
+    splits = build_dataset_splits(args, cfg)
     ds_train = splits["train"]
     ds_val = splits["val"]
     ds_test = splits["test"]
@@ -244,117 +128,106 @@ def run_icassp_suite(args: argparse.Namespace):
     # Save split stats
     save_json(splits["stats"], os.path.join(out_root, "dataset_split_stats.json"))
 
-    methods = _parse_str_list(args.methods)
-    if not methods:
-        methods = ["lobiflow"]
-
-    main_rows = []
-    rollout_horizons = _parse_int_list(args.rollout_horizons)
-    nfe_list = _parse_int_list(args.nfe_list)
+    rollout_horizons = parse_int_list(args.rollout_horizons)
+    nfe_list = parse_int_list(args.nfe_list)
     all_results_index: Dict[str, Any] = {
         "dataset": args.dataset,
-        "methods": methods,
+        "model": "lobiflow",
         "out_dir": out_root,
         "seed": args.seed,
     }
 
-    for method in methods:
-        print(f"\n\n###############################")
-        print(f"# Method: {method}")
-        print(f"###############################")
+    print("\n###############################")
+    print("# Model: lobiflow")
+    print("###############################")
 
-        method_dir = os.path.join(out_root, method)
-        _mkdir(method_dir)
+    model = train_loop(
+        ds_train,
+        cfg,
+        model_name="lobiflow",
+        steps=args.steps,
+        log_every=args.log_every,
+    )
 
-        # Train
-        model = _train_method(method, ds_train, cfg, args)
+    res_A_val = eval_many_windows(
+        ds_val, model, cfg,
+        horizon=args.eval_horizon,
+        nfe=args.eval_nfe,
+        n_windows=args.eval_windows_val,
+        seed=args.seed + 11,
+        horizons_eval=rollout_horizons,
+    )
+    res_A_test = eval_many_windows(
+        ds_test, model, cfg,
+        horizon=args.eval_horizon,
+        nfe=args.eval_nfe,
+        n_windows=args.eval_windows_test,
+        seed=args.seed + 17,
+        horizons_eval=rollout_horizons,
+    )
+    save_json(res_A_val, os.path.join(out_root, "A_main_val.json"))
+    save_json(res_A_test, os.path.join(out_root, "A_main_test.json"))
 
-        # A) Main quantitative eval on VAL + TEST
-        res_A_val = eval_many_windows(
-            ds_val, model, cfg,
-            horizon=args.eval_horizon,
-            nfe=args.eval_nfe,
-            n_windows=args.eval_windows_val,
-            seed=args.seed + 11,
-            horizons_eval=rollout_horizons,
-        )
-        res_A_test = eval_many_windows(
+    if args.run_B:
+        res_B = eval_speed_quality_nfe(
             ds_test, model, cfg,
+            nfe_list=nfe_list,
             horizon=args.eval_horizon,
-            nfe=args.eval_nfe,
-            n_windows=args.eval_windows_test,
-            seed=args.seed + 17,
-            horizons_eval=rollout_horizons,
+            n_windows=args.eval_windows_speedq,
+            seed=args.seed + 23,
+            n_trials_latency=args.latency_trials,
         )
-        save_json(res_A_val, os.path.join(method_dir, "A_main_val.json"))
-        save_json(res_A_test, os.path.join(method_dir, "A_main_test.json"))
-        main_rows.append(_metric_summary_row(method, res_A_test))
+        save_json(res_B, os.path.join(out_root, "B_speed_quality_nfe.json"))
 
-        # B) Speed-quality sweep
-        if args.run_B:
-            res_B = eval_speed_quality_nfe(
-                ds_test, model, cfg,
-                nfe_list=nfe_list,
-                horizon=args.eval_horizon,
-                n_windows=args.eval_windows_speedq,
-                seed=args.seed + 23,
-                n_trials_latency=args.latency_trials,
-            )
-            b_json = os.path.join(method_dir, "B_speed_quality_nfe.json")
-            save_json(res_B, b_json)
-
-            if _HAS_VIZ:
-                try:
-                    plot_speed_quality(res_B, os.path.join(method_dir, "B_speed_quality_nfe.png"))
-                except Exception as e:
-                    print(f"[warn] Failed to plot speed-quality for {method}: {e}")
-            else:
-                print(f"[warn] lob_viz_results import failed, skipping plots: {_VIZ_IMPORT_ERR}")
-
-        # D) Rollout stability
-        if args.run_D:
-            res_D = eval_rollout_horizons(
-                ds_test, model, cfg,
-                horizons=rollout_horizons,
-                nfe=args.eval_nfe,
-                n_windows=args.eval_windows_rollout,
-                seed=args.seed + 29,
-            )
-            d_json = os.path.join(method_dir, "D_rollout_horizons.json")
-            save_json(res_D, d_json)
-
-            if _HAS_VIZ:
-                try:
-                    plot_rollout_stability(res_D, os.path.join(method_dir, "D_rollout_horizons.png"))
-                except Exception as e:
-                    print(f"[warn] Failed to plot rollout stability for {method}: {e}")
-
-        # Qualitative export (bonus)
-        if args.run_qual:
+        if _HAS_VIZ:
             try:
-                npz_path = os.path.join(method_dir, "qual_window.npz")
-                save_qualitative_window_npz(
-                    npz_path,
-                    ds=ds_test,
-                    model=model,
-                    cfg=cfg,
-                    horizon=args.qual_horizon,
-                    nfe=args.qual_nfe,
-                    seed=args.seed + 101,
-                    t0=None,
-                )
-                if _HAS_VIZ:
-                    try:
-                        plot_qualitative(npz_path, os.path.join(method_dir, "qual_window.png"))
-                    except Exception as e:
-                        print(f"[warn] Failed to plot qualitative for {method}: {e}")
+                plot_speed_quality(res_B, os.path.join(out_root, "B_speed_quality_nfe.png"))
             except Exception as e:
-                print(f"[warn] Qualitative export failed for {method}: {e}")
+                print(f"[warn] Failed to plot speed-quality: {e}")
+        else:
+            print(f"[warn] lob_viz_results import failed, skipping plots: {_VIZ_IMPORT_ERR}")
+
+    if args.run_D:
+        res_D = eval_rollout_horizons(
+            ds_test, model, cfg,
+            horizons=rollout_horizons,
+            nfe=args.eval_nfe,
+            n_windows=args.eval_windows_rollout,
+            seed=args.seed + 29,
+        )
+        save_json(res_D, os.path.join(out_root, "D_rollout_horizons.json"))
+
+        if _HAS_VIZ:
+            try:
+                plot_rollout_stability(res_D, os.path.join(out_root, "D_rollout_horizons.png"))
+            except Exception as e:
+                print(f"[warn] Failed to plot rollout stability: {e}")
+
+    if args.run_qual:
+        try:
+            npz_path = os.path.join(out_root, "qual_window.npz")
+            save_qualitative_window_npz(
+                npz_path,
+                ds=ds_test,
+                model=model,
+                cfg=cfg,
+                horizon=args.qual_horizon,
+                nfe=args.qual_nfe,
+                seed=args.seed + 101,
+                t0=None,
+            )
+            if _HAS_VIZ:
+                try:
+                    plot_qualitative(npz_path, os.path.join(out_root, "qual_window.png"))
+                except Exception as e:
+                    print(f"[warn] Failed to plot qualitative: {e}")
+        except Exception as e:
+            print(f"[warn] Qualitative export failed: {e}")
 
     # C) Ablation (typically only for LoBiFlow)
     if args.run_C:
-        ab_dir = os.path.join(out_root, "ablations_lobiflow")
-        _mkdir(ab_dir)
+        ab_dir = os.path.join(out_root, "ablations")
+        mkdir(ab_dir)
 
         # Built-in compact ablations. Safe even if some cfg fields are ignored by your model.
         ablations = [
@@ -399,9 +272,9 @@ def run_icassp_suite(args: argparse.Namespace):
         for r in ab_table_rows:
             print(r)
 
-    # Save compact main summary
-    _print_compact_table(main_rows, title="A) Main Test Results")
-    save_json({"rows": main_rows}, os.path.join(out_root, "A_main_test_summary_rows.json"))
+    main_summary = _metric_summary_row(res_A_test)
+    _print_compact_table([main_summary], title="A) Main Test Results")
+    save_json(main_summary, os.path.join(out_root, "A_main_test_summary.json"))
 
     all_results_index["runtime_sec_total"] = float(time.time() - t_global_start)
     save_json(all_results_index, os.path.join(out_root, "run_index.json"))
@@ -413,24 +286,19 @@ def run_icassp_suite(args: argparse.Namespace):
 # CLI
 # -----------------------------
 def build_argparser() -> argparse.ArgumentParser:
-    ap = argparse.ArgumentParser(description="Run ICASSP experiment suite (A/B/C/D)")
+    ap = argparse.ArgumentParser(description="Run the LoBiFlow ICASSP experiment suite (A/B/C/D).")
 
     # Dataset
-    ap.add_argument("--dataset", type=str, default="synthetic", choices=["synthetic", "fi2010", "npz_l2"])
-    ap.add_argument("--data_path", type=str, default="", help="Path to dataset file. For fi2010: FI-2010-like array (.npy/.npz/.csv). For npz_l2: standardized prepared L2 NPZ (see lob_prepare_dataset.py).")
-    ap.add_argument("--layout", type=str, default="auto", help="FI-2010-like layout (default: auto)")
-    ap.add_argument("--synthetic_length", type=int, default=50000)
+    ap.add_argument("--dataset", type=str, default="synthetic", choices=DATASET_CHOICES)
+    ap.add_argument("--data_path", type=str, default="", help="Path to dataset file. For npz_l2: standardized prepared L2 NPZ (see lob_prepare_dataset.py). For cryptos: optional override for the prepared Tardis NPZ.")
+    ap.add_argument("--synthetic_length", type=int, default=DEFAULT_SYNTHETIC_LENGTH)
 
     # Output
     ap.add_argument("--out_dir", type=str, default="results_icassp")
 
-    # Methods
-    ap.add_argument("--methods", type=str, default="lobiflow,biflow,biflow_nf",
-                    help="Comma-separated methods from {lobiflow,biflow,biflow_nf}")
-
     # Seeds / device
     ap.add_argument("--seed", type=int, default=0)
-    ap.add_argument("--device", type=str, default="cuda" if os.environ.get("CUDA_VISIBLE_DEVICES", "") != "" else "cpu")
+    ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
 
     # Split protocol (chronological)
     ap.add_argument("--train_frac", type=float, default=0.7)
@@ -440,8 +308,8 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--stride_eval", type=int, default=1)
 
     # Common config overrides
-    ap.add_argument("--levels", type=int, default=10)
-    ap.add_argument("--history_len", type=int, default=100)
+    ap.add_argument("--levels", type=int, default=None)
+    ap.add_argument("--history_len", type=int, default=None)
     ap.add_argument("--batch_size", type=int, default=64)
     ap.add_argument("--lr", type=float, default=2e-4)
     ap.add_argument("--weight_decay", type=float, default=1e-4)
@@ -450,7 +318,8 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--standardize", action="store_true", default=True)
     ap.add_argument("--no-standardize", dest="standardize", action="store_false")
 
-    ap.add_argument("--use_cond_features", action="store_true", default=True)
+    ap.add_argument("--lobiflow_variant", type=str, default="quality", choices=["quality", "speed"])
+    ap.add_argument("--use_cond_features", action="store_true", default=False)
     ap.add_argument("--no-cond_features", dest="use_cond_features", action="store_false")
 
     ap.add_argument("--cond_standardize", action="store_true", default=True)
@@ -462,36 +331,43 @@ def build_argparser() -> argparse.ArgumentParser:
     # Optional architecture overrides
     ap.add_argument("--hidden_dim", type=int, default=None)
     ap.add_argument("--ctx_encoder", type=str, default=None)
-
-    ap.add_argument("--film_conditioning", action="store_true", default=None)
-    ap.add_argument("--no-film_conditioning", dest="film_conditioning", action="store_false", help="Disable FiLM conditioning and use early concat instead")
+    ap.add_argument("--ctx_causal", action="store_true", default=None)
+    ap.add_argument("--no-ctx_causal", dest="ctx_causal", action="store_false")
+    ap.add_argument("--ctx_local_kernel", type=int, default=None)
+    ap.add_argument("--ctx_pool_scales", type=str, default=None, help="Comma-separated pooled context scales, e.g. 4,16")
+    ap.add_argument("--field_parameterization", type=str, default=None, choices=["instantaneous", "average"])
+    ap.add_argument("--fu_net_type", type=str, default=None)
+    ap.add_argument("--fu_net_layers", type=int, default=None)
+    ap.add_argument("--fu_net_heads", type=int, default=None)
+    ap.add_argument("--adaptive_context", action="store_true", default=None)
+    ap.add_argument("--no-adaptive_context", dest="adaptive_context", action="store_false")
+    ap.add_argument("--adaptive_context_ratio", type=float, default=None)
+    ap.add_argument("--adaptive_context_min", type=int, default=None)
+    ap.add_argument("--adaptive_context_max", type=int, default=None)
+    ap.add_argument("--train_variable_context", action="store_true", default=None)
+    ap.add_argument("--no-train_variable_context", dest="train_variable_context", action="store_false")
+    ap.add_argument("--train_context_min", type=int, default=None)
+    ap.add_argument("--train_context_max", type=int, default=None)
 
     # Optional loss weights
     ap.add_argument("--lambda_consistency", type=float, default=None)
     ap.add_argument("--lambda_imbalance", type=float, default=None)
+    ap.add_argument("--meanflow_data_proportion", type=float, default=None)
+    ap.add_argument("--meanflow_norm_p", type=float, default=None)
+    ap.add_argument("--meanflow_norm_eps", type=float, default=None)
 
-    # New v2.1 Configs
+    # LoBiFlow options
     ap.add_argument("--use_minibatch_ot", action="store_true", default=None, help="Enable Minibatch Optimal Transport Matching")
+    ap.add_argument("--no-minibatch_ot", dest="use_minibatch_ot", action="store_false", help="Disable Minibatch Optimal Transport Matching")
     ap.add_argument("--cfg_scale", type=float, default=None, help="Classifier-Free Guidance Scale for inference")
-
-    ap.add_argument("--use_pair_regularizer", action="store_true", default=True)
-    ap.add_argument("--no-pair_regularizer", dest="use_pair_regularizer", action="store_false", help="Disable the paired encoder loss in LoBiFlow")
-
-    ap.add_argument(
-        "--lobiflow_profile",
-        type=str,
-        default="recommended",
-        choices=["legacy", "stage1", "stage2", "stage3", "stage4", "recommended"],
-    )
+    ap.add_argument("--solver", type=str, default=None, choices=["euler", "dpmpp2m"], help="Sampling solver.")
     # Training budget
-    ap.add_argument("--steps", type=int, default=5000, help="Training steps for lobiflow/biflow")
-    ap.add_argument("--steps_nf_stage1", type=int, default=5000)
-    ap.add_argument("--steps_nf_stage2", type=int, default=5000)
+    ap.add_argument("--steps", type=int, default=12000, help="Training steps for LoBiFlow.")
     ap.add_argument("--log_every", type=int, default=200)
 
     # Eval A
     ap.add_argument("--eval_horizon", type=int, default=200)
-    ap.add_argument("--eval_nfe", type=int, default=1)
+    ap.add_argument("--eval_nfe", type=int, default=None)
     ap.add_argument("--eval_windows_val", type=int, default=20)
     ap.add_argument("--eval_windows_test", type=int, default=50)
 
@@ -520,7 +396,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--run_qual", action="store_true", default=True)
     ap.add_argument("--no-run_qual", dest="run_qual", action="store_false")
     ap.add_argument("--qual_horizon", type=int, default=200)
-    ap.add_argument("--qual_nfe", type=int, default=1)
+    ap.add_argument("--qual_nfe", type=int, default=2)
 
     return ap
 

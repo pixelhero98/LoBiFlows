@@ -6,12 +6,15 @@ from typing import Any, Dict, Optional, Tuple
 import torch
 
 
+_CONFIG_SECTIONS = ("data", "model", "fm", "nf", "train", "sample")
+
+
 @dataclass
 class LOBDataConfig:
     levels: int = 10
-    history_len: int = 100
+    history_len: int = 256
     standardize: bool = True
-    use_cond_features: bool = True
+    use_cond_features: bool = False
     cond_depths: Tuple[int, ...] = (1, 3, 5, 10)
     cond_vol_window: int = 50
     cond_standardize: bool = True
@@ -26,33 +29,45 @@ class SharedModelConfig:
     hidden_dim: int = 128
     dropout: float = 0.1
     cond_dim: int = 0
-    cfg_dropout: float = 0.1
-    ctx_encoder: str = "multiscale"
+    baseline_latent_dim: int = 32
+    vae_kl_weight: float = 0.1
+    timegan_supervision_weight: float = 10.0
+    timegan_moment_weight: float = 10.0
+    kovae_pred_weight: float = 1.0
+    kovae_ridge: float = 1e-3
+    ctx_encoder: str = "transformer"
+    ctx_causal: bool = True
+    ctx_local_kernel: int = 5
+    ctx_pool_scales: Tuple[int, ...] = (4, 16)
+    field_parameterization: str = "instantaneous"
     ctx_heads: int = 4
     ctx_layers: int = 2
+    gan_noise_dim: int = 64
+    cgan_recon_weight: float = 5.0
+    diffusion_steps: int = 32
+    adaptive_context: bool = False
+    adaptive_context_ratio: float = 1.5
+    adaptive_context_min: int = 64
+    adaptive_context_max: int = 256
+    train_variable_context: bool = False
+    train_context_min: int = 64
+    train_context_max: int = 256
     use_res_mlp: bool = True
-    film_conditioning: bool = True
     fu_net_type: str = "transformer"
     fu_net_layers: int = 3
     fu_net_heads: int = 4
-    lobiflow_profile: str = "recommended"
-    use_multiscale_context: bool = False
 
 
 @dataclass
 class FMConfig:
     lambda_mean: float = 1.0
-    lambda_pair: float = 0.25
-    lambda_prior: float = 1e-3
     lambda_consistency: float = 0.0
-    lambda_imbalance: float = 0.05
-    pair_align_weight: float = 0.25
+    lambda_imbalance: float = 0.0
     use_minibatch_ot: bool = True
-    use_paired_encoder: bool = True
-    use_pair_regularizer: bool = True
-    use_consistency_training: bool = False
     consistency_steps: int = 32
-    consistency_step_choices: Tuple[int, ...] = ()
+    meanflow_data_proportion: float = 0.75
+    meanflow_norm_p: float = 1.0
+    meanflow_norm_eps: float = 0.01
 
 
 @dataclass
@@ -79,8 +94,9 @@ class TrainConfig:
 
 @dataclass
 class SampleConfig:
-    steps: int = 32
+    steps: int = 2
     cfg_scale: float = 1.0
+    solver: str = "euler"
 
 
 @dataclass(init=False)
@@ -112,7 +128,7 @@ class LOBConfig:
             self.apply_overrides(**flat_overrides)
 
     def __getattr__(self, name: str) -> Any:
-        for section_name in ("data", "model", "fm", "nf", "train", "sample"):
+        for section_name in _CONFIG_SECTIONS:
             section = object.__getattribute__(self, section_name)
             if hasattr(section, name):
                 return getattr(section, name)
@@ -121,7 +137,7 @@ class LOBConfig:
     def apply_overrides(self, **flat_overrides: Any) -> "LOBConfig":
         for key, value in flat_overrides.items():
             matched = False
-            for section_name in ("data", "model", "fm", "nf", "train", "sample"):
+            for section_name in _CONFIG_SECTIONS:
                 section = getattr(self, section_name)
                 if hasattr(section, key):
                     setattr(section, key, value)
@@ -136,11 +152,14 @@ class LOBConfig:
         return self.data.state_dim
 
     def to_dict(self) -> Dict[str, Dict[str, Any]]:
+        train_dict = asdict(self.train)
+        if isinstance(train_dict.get("device"), torch.device):
+            train_dict["device"] = str(train_dict["device"])
         return {
             "data": asdict(self.data),
             "model": asdict(self.model),
             "fm": asdict(self.fm),
             "nf": asdict(self.nf),
-            "train": asdict(self.train),
+            "train": train_dict,
             "sample": asdict(self.sample),
         }
