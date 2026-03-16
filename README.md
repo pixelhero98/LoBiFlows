@@ -19,9 +19,31 @@ paper-ready evaluation.
 - Binance crypto LOB snapshots from Tardis
 - Databento ES futures MBP-10
 
+## Verified Metrics
+
+Primary metrics:
+
+- `TSTR MacroF1`
+- `Disc.AUC Gap`
+- `Unconditional W1`
+- `Conditional W1`
+
+Additional diagnostics:
+
+- `U-L1`
+- `C-L1`
+- `spread_specific_error`
+- `imbalance_specific_error`
+- `ret_vol_acf_error`
+- `impact_response_error`
+- `efficiency_ms_per_sample`
+
+The benchmark summaries also report the composite `score_main` used for model
+ranking.
+
 ## Main Scripts
 
-- `Model/experiments_icassp.py`: main LoBiFlow runner
+- `Model/experiments_lobiflow.py`: main LoBiFlow runner
 - `Model/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
 - `Model/export_model_metric_catalogs.py`: flat metric catalog export
 - `Model/test_lobiflow.py`: smoke and regression suite
@@ -32,17 +54,17 @@ Run the main LoBiFlow suite with dataset-specific defaults:
 
 ```bash
 cd Model
-python experiments_icassp.py --dataset synthetic --out_dir results_synth
-python experiments_icassp.py --dataset optiver --out_dir results_optiver
-python experiments_icassp.py --dataset cryptos --out_dir results_cryptos
-python experiments_icassp.py --dataset es_mbp_10 --out_dir results_es
+python experiments_lobiflow.py --dataset synthetic --out_dir results_synth
+python experiments_lobiflow.py --dataset optiver --out_dir results_optiver
+python experiments_lobiflow.py --dataset cryptos --out_dir results_cryptos
+python experiments_lobiflow.py --dataset es_mbp_10 --out_dir results_es
 ```
 
 Run the faster `NFE=1` speed variant:
 
 ```bash
 cd Model
-python experiments_icassp.py --dataset cryptos --lobiflow_variant speed --out_dir results_cryptos_speed
+python experiments_lobiflow.py --dataset cryptos --lobiflow_variant speed --out_dir results_cryptos_speed
 ```
 
 Run the paper-ready benchmark bundle:
@@ -73,24 +95,29 @@ Typical examples:
 
 ```bash
 cd Model
-python experiments_icassp.py --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
-python experiments_icassp.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
-python experiments_icassp.py --dataset synthetic --synthetic_length 5000000 --steps 20000
+python experiments_lobiflow.py --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
+python experiments_lobiflow.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
+python experiments_lobiflow.py --dataset synthetic --synthetic_length 5000000 --steps 20000
 ```
 
 Current quality presets:
 
 - `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
 - `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
-- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=1`
 - `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
 
 ## Final Outputs
 
-Paper-ready benchmark outputs are written under:
+In the source repo, paper-ready benchmark outputs are written under:
 
 - `Model/results_benchmark_lobiflow_paper_ready_20260315`
 - `Model/results_model_metric_catalogs_20260316`
+
+In the packaged local bundle (`LoBiFlow_paper_ready`), the copied outputs are under:
+
+- `results/results_benchmark_lobiflow_paper_ready_20260315`
+- `results/results_model_metric_catalogs_20260316`
 
 The flat CSVs in `results_model_metric_catalogs_20260316` are the easiest entry
 point for comparing LoBiFlow against all baselines.
