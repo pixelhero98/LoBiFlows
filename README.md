@@ -46,6 +46,7 @@ ranking.
 - `scripts/experiments_lobiflow.py`: main LoBiFlow runner
 - `scripts/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
 - `scripts/export_model_metric_catalogs.py`: flat metric catalog export
+- `scripts/make_regularization_ablation_plots.py`: generate pilot ablation figures
 - `scripts/test_lobiflow.py`: smoke and regression suite
 
 ## Usage
@@ -145,3 +146,6 @@ The detailed summary and supporting diagnostics are in:
 
 - `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
 - `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json`
+- `scripts/results_regularization_ablation_20260324/causal_ot_applicability.png`
+- `scripts/results_regularization_ablation_20260324/current_matching_applicability.png`
+- `scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png`
