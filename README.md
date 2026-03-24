@@ -149,3 +149,11 @@ The detailed summary and supporting diagnostics are in:
 - `scripts/results_regularization_ablation_20260324/causal_ot_applicability.png`
 - `scripts/results_regularization_ablation_20260324/current_matching_applicability.png`
 - `scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png`
+
+Pilot figures:
+
+![History-local causal OT applicability](scripts/results_regularization_ablation_20260324/causal_ot_applicability.png)
+
+![Conditional current matching applicability](scripts/results_regularization_ablation_20260324/current_matching_applicability.png)
+
+![Causal OT checkpoint curve on cryptos](scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png)
