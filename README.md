@@ -113,6 +113,35 @@ Paper-ready benchmark outputs are written under:
 
 - `scripts/results_benchmark_lobiflow_paper_ready_20260315`
 - `scripts/results_model_metric_catalogs_20260316`
+- `scripts/results_regularization_ablation_20260324`
 
 The flat CSVs in `results_model_metric_catalogs_20260316` are the easiest entry
 point for comparing LoBiFlow against all baselines.
+
+Key summaries:
+
+- `scripts/results_benchmark_lobiflow_paper_ready_20260315/final_metric_summary.md`
+- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
+
+## Structured Conditional Regularization Ablation
+
+We evaluated several structured conditional regularizers on top of the final
+LoBiFlow architecture:
+
+- history-local causal OT
+- global causal OT
+- conditional current matching
+- MI regularization
+- path-space conditional FM
+
+The conclusion is narrow but useful:
+
+- none of these regularizers replaced the accepted final LoBiFlow defaults
+- history-local causal OT was the strongest candidate
+- its benefits were dataset-specific and strongest on `cryptos`
+- the effect was largest at shorter optimization budgets and weakened later
+
+The detailed summary and supporting diagnostics are in:
+
+- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
+- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json`
