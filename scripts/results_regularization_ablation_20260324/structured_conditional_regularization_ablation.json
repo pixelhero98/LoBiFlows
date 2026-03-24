@@ -1,0 +1,173 @@
+{
+  "study_name": "structured_conditional_regularization_ablation",
+  "date": "2026-03-24",
+  "accepted_conclusion": "No tested structured conditional regularizer replaced the accepted final LoBiFlow defaults. History-local causal OT was the strongest candidate, but its benefit was dataset-specific and stage-dependent.",
+  "regularizers": {
+    "causal_ot_global": {
+      "status": "candidate",
+      "summary": "Helped on cryptos, hurt on optiver."
+    },
+    "causal_ot_history_local": {
+      "status": "strongest_candidate",
+      "summary": "Best short-budget gains on cryptos; weak or negative elsewhere; did not robustly replace the full-budget crypto baseline."
+    },
+    "current_matching_raw": {
+      "status": "rejected",
+      "summary": "Hard regression."
+    },
+    "current_matching_safe": {
+      "status": "rejected_for_default",
+      "summary": "Short-budget cryptos gain only; full-budget crypto refresh worsened score and Wasserstein metrics."
+    },
+    "mi_infonce": {
+      "status": "rejected",
+      "summary": "Negative on optiver and cryptos."
+    },
+    "mi_frozen_critic": {
+      "status": "rejected",
+      "summary": "Negative on optiver."
+    },
+    "path_space_conditional_fm": {
+      "status": "rejected",
+      "summary": "Negative on optiver and cryptos."
+    }
+  },
+  "causal_ot": {
+    "short_budget_cryptos_confirm": {
+      "baseline": {
+        "score_main": 1.744,
+        "tstr_macro_f1": 0.205,
+        "unconditional_w1": 16.859,
+        "conditional_w1": 16.65
+      },
+      "local_causal_ot": {
+        "score_main": 1.565,
+        "tstr_macro_f1": 0.231,
+        "unconditional_w1": 11.336,
+        "conditional_w1": 11.318
+      }
+    },
+    "applicability_diagnostics": [
+      {
+        "dataset": "synthetic",
+        "local_global_dispersion_ratio": 0.0172,
+        "neighborhood_stability_k_vs_2k": 0.0095,
+        "observed_effect": "negative"
+      },
+      {
+        "dataset": "optiver",
+        "local_global_dispersion_ratio": 0.4461,
+        "neighborhood_stability_k_vs_2k": 0.0203,
+        "observed_effect": "negative"
+      },
+      {
+        "dataset": "cryptos",
+        "local_global_dispersion_ratio": 0.0228,
+        "neighborhood_stability_k_vs_2k": 0.0059,
+        "observed_effect": "positive"
+      },
+      {
+        "dataset": "es_mbp_10",
+        "local_global_dispersion_ratio": 0.4052,
+        "neighborhood_stability_k_vs_2k": 0.0182,
+        "observed_effect": "weak_or_mixed"
+      }
+    ],
+    "checkpoint_sweep_cryptos_seed0": [
+      {
+        "steps": 1000,
+        "baseline_score_main": 2.0694,
+        "local_causal_ot_score_main": 1.7924
+      },
+      {
+        "steps": 2000,
+        "baseline_score_main": 2.0299,
+        "local_causal_ot_score_main": 1.8729
+      },
+      {
+        "steps": 4000,
+        "baseline_score_main": 1.972,
+        "local_causal_ot_score_main": 1.7071
+      },
+      {
+        "steps": 8000,
+        "baseline_score_main": 1.6457,
+        "local_causal_ot_score_main": 1.3959
+      },
+      {
+        "steps": 12000,
+        "baseline_score_main": 1.4323,
+        "local_causal_ot_score_main": 1.4022
+      }
+    ],
+    "full_budget_cryptos_partial_refresh": {
+      "baseline_two_seed": {
+        "score_main": 1.815,
+        "tstr_macro_f1": 0.1467,
+        "unconditional_w1": 65.69,
+        "conditional_w1": 62.45
+      },
+      "local_causal_ot_two_seed": {
+        "score_main": 1.8455,
+        "tstr_macro_f1": 0.1842,
+        "unconditional_w1": 90.83,
+        "conditional_w1": 90.36
+      }
+    }
+  },
+  "current_matching": {
+    "short_budget_cryptos_confirm": {
+      "baseline": {
+        "score_main": 1.7361,
+        "tstr_macro_f1": 0.2105,
+        "unconditional_w1": 16.5091,
+        "conditional_w1": 16.3398
+      },
+      "lambda_0p0005": {
+        "score_main": 1.5006,
+        "tstr_macro_f1": 0.2143,
+        "unconditional_w1": 9.8496,
+        "conditional_w1": 9.8338
+      }
+    },
+    "applicability_diagnostics": [
+      {
+        "dataset": "synthetic",
+        "predictable_current_share": 0.49,
+        "neighborhood_stability_k_vs_2k": 1.015,
+        "observed_effect": "negative"
+      },
+      {
+        "dataset": "optiver",
+        "predictable_current_share": 0.61,
+        "neighborhood_stability_k_vs_2k": 1.249,
+        "observed_effect": "negative"
+      },
+      {
+        "dataset": "cryptos",
+        "predictable_current_share": 0.79,
+        "neighborhood_stability_k_vs_2k": 1.084,
+        "observed_effect": "positive"
+      },
+      {
+        "dataset": "es_mbp_10",
+        "predictable_current_share": 0.44,
+        "neighborhood_stability_k_vs_2k": 1.066,
+        "observed_effect": "negative"
+      }
+    ],
+    "full_budget_cryptos_refresh": {
+      "baseline": {
+        "score_main": 1.83,
+        "tstr_macro_f1": 0.1596,
+        "unconditional_w1": 63.0028,
+        "conditional_w1": 60.9227
+      },
+      "safe_current_matching": {
+        "score_main": 1.8942,
+        "tstr_macro_f1": 0.1755,
+        "unconditional_w1": 69.3745,
+        "conditional_w1": 69.1723
+      }
+    }
+  }
