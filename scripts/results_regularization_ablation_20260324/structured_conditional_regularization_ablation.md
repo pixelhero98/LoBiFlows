@@ -25,6 +25,39 @@ structure, irreversibility, or history-local future coupling.
    `cryptos`, but its benefit was stage-dependent and did not survive the final
    broad benchmark refresh strongly enough to replace the base model.
 
+## Pilot Visualizations
+
+These pilot figures summarize the main ablation story:
+
+1. local causal OT helps only when local future laws are concentrated and
+   stable enough
+2. current matching helps only when a large share of path current is locally
+   predictable
+3. local causal OT is primarily an early-stage shaping regularizer
+
+### Causal OT applicability
+
+![History-local causal OT applicability](causal_ot_applicability.png)
+
+The useful pattern is that `cryptos` combines low local/global dispersion with
+low neighborhood instability. `synthetic` also has strong locality, but its
+baseline already leaves much less conditional headroom.
+
+### Current matching applicability
+
+![Conditional current matching applicability](current_matching_applicability.png)
+
+Only `cryptos` combines high predictable-current share with acceptable local
+target stability strongly enough to produce a short-budget gain.
+
+### Training-stage dependence on cryptos
+
+![Causal OT checkpoint curve on cryptos](causal_ot_checkpoint_curve_cryptos.png)
+
+The local causal-OT advantage is largest early and shrinks as plain FM is
+trained longer. This is why the regularizer looked promising in short-budget
+pilots but did not replace the accepted full-budget default.
+
 ## Causal OT
 
 ### Short-budget result
