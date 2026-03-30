@@ -1,5 +1,7 @@
 # Final Metric Summary
 
+_Generated from the published paper-ready metric catalogs; do not hand-edit._
+
 This file summarizes the accepted paper-ready LoBiFlow results. Lower is better
 for all metrics except `TSTR MacroF1`, where higher is better.
 
@@ -7,7 +9,7 @@ for all metrics except `TSTR MacroF1`, where higher is better.
 
 - `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
 - `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
-- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=1`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
 - `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
 
 ## LoBiFlow Quality Results
@@ -27,10 +29,10 @@ Best baseline on `score_main` for each dataset:
 
 | Dataset | LoBiFlow | Best baseline | Outcome |
 | --- | ---: | ---: | --- |
-| `synthetic` | `0.4017 +/- 0.0227` | `TimeGAN 0.5107 +/- 0.0034` | LoBiFlow wins |
-| `optiver` | `0.3704 +/- 0.0110` | `KoVAE 0.4045 +/- 0.0110` | LoBiFlow wins |
-| `cryptos` | `1.7313 +/- 0.1812` | `CGAN 2.1919 +/- 0.3634` | LoBiFlow wins |
-| `es_mbp_10` | `0.4562 +/- 0.0053` | `TimeCausalVAE 0.5507 +/- 0.0484` | LoBiFlow wins |
+| `synthetic` | `0.3711 +/- 0.0105` | `TimeGAN 0.5107 +/- 0.0034` | LoBiFlow wins |
+| `optiver` | `0.3595 +/- 0.0118` | `KoVAE 0.4045 +/- 0.0110` | LoBiFlow wins |
+| `cryptos` | `1.8300 +/- 0.1070` | `CGAN 2.1919 +/- 0.3634` | LoBiFlow wins |
+| `es_mbp_10` | `0.4569 +/- 0.0105` | `TimeCausalVAE 0.5507 +/- 0.0484` | LoBiFlow wins |
 
 ## Full 4+7 Metric Tables
 

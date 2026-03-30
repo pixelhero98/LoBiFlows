@@ -46,6 +46,7 @@ ranking.
 - `scripts/experiments_lobiflow.py`: main LoBiFlow runner
 - `scripts/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
 - `scripts/export_model_metric_catalogs.py`: flat metric catalog export
+- `scripts/generate_final_metric_summary.py`: regenerate the published metric summary from the paper-ready catalogs
 - `scripts/make_regularization_ablation_plots.py`: generate pilot ablation figures
 - `scripts/test_lobiflow.py`: smoke and regression suite
 
@@ -101,11 +102,11 @@ python experiments_lobiflow.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
 python experiments_lobiflow.py --dataset synthetic --synthetic_length 5000000 --steps 20000
 ```
 
-Current quality presets:
+Published paper-ready quality presets:
 
 - `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
 - `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
-- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=1`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
 - `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
 
 ## Final Outputs
