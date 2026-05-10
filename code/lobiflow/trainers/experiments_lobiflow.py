@@ -294,7 +294,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--synthetic_length", type=int, default=DEFAULT_SYNTHETIC_LENGTH)
 
     # Output
-    ap.add_argument("--out_dir", type=str, default="results_main")
+    ap.add_argument("--out_dir", type=str, default="results/main")
 
     # Seeds / device
     ap.add_argument("--seed", type=int, default=0)

@@ -93,7 +93,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Benchmark snapshot baselines against LoBiFlow.")
     ap.add_argument("--models", type=str, default="trades,cgan,timecausalvae,timegan,kovae")
     ap.add_argument("--datasets", type=str, default="synthetic,optiver,cryptos,es_mbp_10")
-    ap.add_argument("--out_root", type=str, default="results_benchmark_strict_baselines")
+    ap.add_argument("--out_root", type=str, default="results/benchmark_strict_baselines")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seeds", type=str, default="0,1,2,3,4")
     ap.add_argument("--dataset_seed", type=int, default=0)

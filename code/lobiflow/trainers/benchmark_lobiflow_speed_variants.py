@@ -57,7 +57,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Compare LoBiFlow quality presets against NFE=1 speed variants.")
     ap.add_argument("--datasets", type=str, default="synthetic,optiver,cryptos,es_mbp_10")
     ap.add_argument("--seeds", type=str, default="0,1,2")
-    ap.add_argument("--out_root", type=str, default="results_benchmark_lobiflow_speed_variants")
+    ap.add_argument("--out_root", type=str, default="results/benchmark_lobiflow_speed_variants")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--dataset_seed", type=int, default=0)
     ap.add_argument("--log_every", type=int, default=500)

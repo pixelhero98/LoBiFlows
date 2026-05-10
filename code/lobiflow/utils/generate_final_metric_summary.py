@@ -7,9 +7,9 @@ import json
 from pathlib import Path
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-PAPER_READY_DIR = SCRIPT_DIR / "results_benchmark_lobiflow_paper_ready_20260315"
-MODEL_CATALOG_DIR = SCRIPT_DIR / "results_model_metric_catalogs_20260316"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+PAPER_READY_DIR = REPO_ROOT / "results" / "benchmark_lobiflow_paper_ready"
+MODEL_CATALOG_DIR = REPO_ROOT / "results" / "model_metric_catalogs"
 OUTPUT_PATH = PAPER_READY_DIR / "final_metric_summary.md"
 
 OVERALL_SUMMARY_PATH = PAPER_READY_DIR / "overall_summary.json"
@@ -156,8 +156,8 @@ def main() -> None:
             "",
             "The full `4` primary + `7` diagnostic metrics are stored in:",
             "",
-            "- `scripts/results_benchmark_lobiflow_paper_ready_20260315/metric_catalog.csv`",
-            "- `scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.csv`",
+            "- `results/benchmark_lobiflow_paper_ready/metric_catalog.csv`",
+            "- `results/model_metric_catalogs/all_models_metric_catalog.csv`",
             "",
             "These CSVs are the main comparison entry points for:",
             "",

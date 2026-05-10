@@ -8,9 +8,9 @@ import math
 from pathlib import Path
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-MODEL_CATALOG_DIR = SCRIPT_DIR / "results_model_metric_catalogs_20260316"
-OUTPUT_DIR = SCRIPT_DIR / "results_benchmark_lobiflow_paper_ready_20260315"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+MODEL_CATALOG_DIR = REPO_ROOT / "results" / "model_metric_catalogs"
+OUTPUT_DIR = REPO_ROOT / "results" / "benchmark_lobiflow_paper_ready"
 INPUT_PATH = MODEL_CATALOG_DIR / "all_models_metric_catalog.json"
 OUTPUT_PATH = OUTPUT_DIR / "main_benchmark_table.tex"
 
@@ -104,7 +104,7 @@ def _validate_lookup(lookup: dict[tuple[str, str, str], dict]) -> None:
 
 def _render_table(lookup: dict[tuple[str, str, str], dict], best: dict[tuple[str, str], str]) -> str:
     lines: list[str] = [
-        "% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json; do not hand-edit.",
+        "% Generated from results/model_metric_catalogs/all_models_metric_catalog.json; do not hand-edit.",
         r"\begin{table*}[t]",
         r"\centering",
         r"\caption{Main benchmark results using macro-over-horizon test metrics. Values are mean$\pm$std over seeds. Results are macro-averaged over the benchmark rollout horizons defined per dataset. Best per dataset/metric in bold.}",

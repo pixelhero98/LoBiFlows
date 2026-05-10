@@ -9,8 +9,8 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 
-ROOT = Path(__file__).resolve().parent
-ABLATION_DIR = ROOT / "results_regularization_ablation_20260324"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+ABLATION_DIR = REPO_ROOT / "results" / "regularization_ablation"
 SUMMARY_PATH = ABLATION_DIR / "structured_conditional_regularization_ablation.json"
 CURRENT_MATCHING_DPI = 600
 PLOT_DPI = 600

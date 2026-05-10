@@ -95,7 +95,7 @@ DATASET_SPECS: Mapping[str, DatasetSpec] = {
 def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Distill a one-step LoBiFlow student from a multi-step teacher.")
     ap.add_argument("--dataset", type=str, default="cryptos", choices=tuple(DATASET_SPECS.keys()))
-    ap.add_argument("--out_root", type=str, default="results_lobiflow_one_step_distill")
+    ap.add_argument("--out_root", type=str, default="results/lobiflow_one_step_distill")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--dataset_seed", type=int, default=0)

@@ -94,7 +94,7 @@ ALL_METRICS = PRIMARY_METRICS + EXTRA_METRICS
 def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Run targeted context-architecture follow-up on cryptos and es_mbp_10.")
     ap.add_argument("--datasets", type=str, default="cryptos,es_mbp_10")
-    ap.add_argument("--out_root", type=str, default="results_context_architecture_followup")
+    ap.add_argument("--out_root", type=str, default="results/context_architecture_followup")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seeds", type=str, default="0,1,2")
     ap.add_argument("--dataset_seed", type=int, default=0)

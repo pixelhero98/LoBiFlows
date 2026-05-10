@@ -1,9 +1,9 @@
 # LoBiFlow
 
 LoBiFlow is a history-conditioned flow-matching model for generating level-2
-limit order books. This project includes the training code, benchmark scripts,
-dataset preparation utilities, and final experiment artifacts used for the
-paper-ready evaluation.
+limit order books. This repository contains the public training code,
+benchmark runners, dataset preparation utilities, and compact result artifacts
+used for the paper-ready evaluation.
 
 ## Scope
 
@@ -12,15 +12,29 @@ paper-ready evaluation.
 - conditioning: transformer or hybrid history encoder
 - evaluation: 4 primary metrics + 7 diagnostic metrics
 
+## Repository Layout
+
+- `code/lobiflow/datasets/`: dataset loaders and preparation utilities
+- `code/lobiflow/models/`: LoBiFlow, baselines, conditioning modules, and configs
+- `code/lobiflow/trainers/`: training, evaluation, benchmarks, and sweeps
+- `code/lobiflow/utils/`: metrics, tables, catalogs, and plot generators
+- `code/lobiflow/tests/`: smoke and regression tests
+- `data/`: local prepared datasets and raw caches; not tracked except compact public metadata
+- `results/`: curated paper and ablation artifacts with stable public names
+
+Set `PYTHONPATH=code` when running modules from a source checkout.
+
 ## Datasets
+
+Supported datasets:
 
 - LOBSTER-calibrated synthetic data
 - Optiver Realized Volatility Prediction
 - Binance crypto LOB snapshots from Tardis
 - Databento ES futures MBP-10
 
-Prepared non-ES datasets are hosted at
-`pixelhero98/lobiflow` on Hugging Face. From the repository root:
+Prepared non-ES datasets are hosted at `pixelhero98/lobiflow` on Hugging Face.
+From the repository root:
 
 ```bash
 pip install -U huggingface_hub
@@ -29,21 +43,21 @@ hf download pixelhero98/lobiflow --repo-type dataset --local-dir .
 
 This populates:
 
-- `scripts/data_cryptos/cryptos_binance_spot_monthly_1s_l10.npz`
-- `scripts/data_optiver/optiver_train_8stocks_l2.npz`
-- `scripts/data_synthetic/lobster_free_sample_profile_10.json`
+- `data/cryptos/cryptos_binance_spot_monthly_1s_l10.npz`
+- `data/optiver/optiver_train_8stocks_l2.npz`
+- `data/synthetic/lobster_free_sample_profile_10.json`
 
 The ES-MBP-10 raw Databento cache is hosted separately at
-`pixelhero98/es-mbp-10`. Download the raw cache, then rebuild the processed
-NPZ used by the experiments:
+`pixelhero98/es-mbp-10`. Download the raw cache, then rebuild the processed NPZ
+used by the experiments:
 
 ```bash
 pip install -U huggingface_hub databento pandas
-hf download pixelhero98/es-mbp-10 --repo-type dataset --include "scripts/data_databento/databento_cache/**" --local-dir .
-python scripts/prepare_databento.py --cache_root scripts/data_databento/databento_cache --output scripts/data_databento/es_mbp_10.npz
+hf download pixelhero98/es-mbp-10 --repo-type dataset --include "data/databento/databento_cache/**" --local-dir .
+PYTHONPATH=code python -m lobiflow.datasets.prepare_databento --cache_root data/databento/databento_cache --output data/databento/es_mbp_10.npz
 ```
 
-If a cached Databento day is missing, `prepare_databento.py` can fetch it when
+If a cached Databento day is missing, `prepare_databento` can fetch it when
 `DATABENTO_API_KEY` is set. The default ES request is `GLBX.MDP3`, schema
 `mbp-10`, symbol `ES.v.0`, continuous stype, `2026-02-10` to `2026-03-10`,
 sampled at 1 second.
@@ -70,50 +84,50 @@ Additional diagnostics:
 The benchmark summaries also report the composite `score_main` used for model
 ranking.
 
-## Main Scripts
+## Public Commands
 
-- `scripts/experiments_lobiflow.py`: main LoBiFlow runner
-- `scripts/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
-- `scripts/export_model_metric_catalogs.py`: flat metric catalog export
-- `scripts/generate_final_metric_summary.py`: regenerate the published metric summary from the paper-ready catalogs
-- `scripts/generate_main_benchmark_latex_table.py`: regenerate the main paper LaTeX benchmark table from the merged benchmark catalog
-- `scripts/generate_additional_results_slots.py`: generate the three single-column additional-results slots for the paper body
-- `scripts/generate_abstract_aligned_additional_results_slots.py`: generate an alternative abstract-aligned three-slot bundle focused on efficiency and structured regularization outcomes
-- `scripts/regularization_training_curve.py`: reproduce structured-regularization training-step sweeps
-- `scripts/make_regularization_ablation_plots.py`: generate pilot ablation figures
-- `scripts/test_lobiflow.py`: smoke and regression suite
-
-## Usage
-
-Run the main LoBiFlow suite with dataset-specific defaults:
+Main training and evaluation runner:
 
 ```bash
-cd scripts
-python experiments_lobiflow.py --dataset synthetic --out_dir results_synth
-python experiments_lobiflow.py --dataset optiver --out_dir results_optiver
-python experiments_lobiflow.py --dataset cryptos --out_dir results_cryptos
-python experiments_lobiflow.py --dataset es_mbp_10 --out_dir results_es
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset synthetic --out_dir results/synthetic_main
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset optiver --out_dir results/optiver_main
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset cryptos --out_dir results/cryptos_main
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset es_mbp_10 --out_dir results/es_mbp_10_main
 ```
 
-Run the faster `NFE=1` speed variant:
+Faster `NFE=1` speed variant:
 
 ```bash
-cd scripts
-python experiments_lobiflow.py --dataset cryptos --lobiflow_variant speed --out_dir results_cryptos_speed
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset cryptos --lobiflow_variant speed --out_dir results/cryptos_speed
 ```
 
-Run the paper-ready benchmark bundle:
+Paper-ready benchmark and result regeneration:
 
 ```bash
-cd scripts
-python benchmark_lobiflow_paper_ready.py
+PYTHONPATH=code python -m lobiflow.trainers.benchmark_lobiflow_paper_ready
+PYTHONPATH=code python -m lobiflow.utils.export_model_metric_catalogs
+PYTHONPATH=code python -m lobiflow.utils.generate_final_metric_summary
+PYTHONPATH=code python -m lobiflow.utils.generate_main_benchmark_latex_table
+PYTHONPATH=code python -m lobiflow.utils.generate_additional_results_slots
+PYTHONPATH=code python -m lobiflow.utils.generate_abstract_aligned_additional_results_slots
+PYTHONPATH=code python -m lobiflow.utils.make_regularization_ablation_plots
 ```
 
-Export flat CSV/JSON metric catalogs:
+Structured regularization sweep:
 
 ```bash
-cd scripts
-python export_model_metric_catalogs.py
+PYTHONPATH=code python -m lobiflow.trainers.regularization_training_curve \
+  --dataset cryptos \
+  --variants baseline_fm,local_causal_ot,conditional_current_matching \
+  --seeds 0,1,2 \
+  --checkpoints 1000,2000,4000,8000,12000,16000,20000 \
+  --out_root results/regularization_ablation/training_curve_cryptos_20k
+```
+
+Smoke and regression tests:
+
+```bash
+PYTHONPATH=code python -m pytest code/lobiflow/tests/test_lobiflow.py
 ```
 
 ## Hyperparameter Tuning
@@ -129,10 +143,9 @@ LoBiFlow applies dataset presets first, then CLI overrides. The main knobs are:
 Typical examples:
 
 ```bash
-cd scripts
-python experiments_lobiflow.py --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
-python experiments_lobiflow.py --dataset optiver --eval_nfe 4 --solver dpmpp2m
-python experiments_lobiflow.py --dataset synthetic --synthetic_length 5000000 --steps 20000
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset cryptos --history_len 384 --ctx_encoder hybrid --ctx_local_kernel 7 --ctx_pool_scales 8,32
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset optiver --eval_nfe 4 --solver dpmpp2m
+PYTHONPATH=code python -m lobiflow.trainers.experiments_lobiflow --dataset synthetic --synthetic_length 5000000 --steps 20000
 ```
 
 Published paper-ready quality presets:
@@ -144,30 +157,31 @@ Published paper-ready quality presets:
 
 ## Final Outputs
 
-Paper-ready benchmark outputs are written under:
+Curated public artifacts are stored under:
 
-- `scripts/results_benchmark_lobiflow_paper_ready_20260315`
-- `scripts/results_model_metric_catalogs_20260316`
-- `scripts/results_regularization_ablation_20260324`
-- `scripts/results_additional_results_slots_20260409`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409`
+- `results/benchmark_lobiflow_paper_ready/`
+- `results/model_metric_catalogs/`
+- `results/regularization_ablation/`
+- `results/additional_results_slots/`
+- `results/additional_results_slots_abstract_aligned/`
+- `results/optiver_resmlp_confirm/`
 
-The flat CSVs in `results_model_metric_catalogs_20260316` are the easiest entry
-point for comparing LoBiFlow against all baselines.
+The flat CSVs in `results/model_metric_catalogs/` are the easiest entry point
+for comparing LoBiFlow against all baselines.
 
 Key summaries:
 
-- `scripts/results_benchmark_lobiflow_paper_ready_20260315/final_metric_summary.md`
-- `scripts/results_benchmark_lobiflow_paper_ready_20260315/main_benchmark_table.tex`
-- `scripts/results_additional_results_slots_20260409/slot1_lobiflow_variant_ablation.tex`
-- `scripts/results_additional_results_slots_20260409/slot2_regularization_diagnostics.png`
-- `scripts/results_additional_results_slots_20260409/slot3_optiver_field_efficiency.tex`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot1_efficiency_tradeoff.tex`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot2_causal_ot_results.pdf`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot2_causal_ot_results.tex`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot3_current_matching_results.pdf`
-- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot3_current_matching_results.tex`
-- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
+- `results/benchmark_lobiflow_paper_ready/final_metric_summary.md`
+- `results/benchmark_lobiflow_paper_ready/main_benchmark_table.tex`
+- `results/additional_results_slots/slot1_lobiflow_variant_ablation.tex`
+- `results/additional_results_slots/slot2_regularization_diagnostics.png`
+- `results/additional_results_slots/slot3_optiver_field_efficiency.tex`
+- `results/additional_results_slots_abstract_aligned/slot1_efficiency_tradeoff.tex`
+- `results/additional_results_slots_abstract_aligned/slot2_causal_ot_results.pdf`
+- `results/additional_results_slots_abstract_aligned/slot2_causal_ot_results.tex`
+- `results/additional_results_slots_abstract_aligned/slot3_current_matching_results.pdf`
+- `results/additional_results_slots_abstract_aligned/slot3_current_matching_results.tex`
+- `results/regularization_ablation/structured_conditional_regularization_ablation.md`
 
 ## Structured Conditional Regularization Ablation
 
@@ -189,24 +203,31 @@ The conclusion is narrow but useful:
 
 The detailed summary and supporting diagnostics are in:
 
-- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
-- `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json`
-- `scripts/results_regularization_ablation_20260324/causal_ot_applicability.png`
-- `scripts/results_regularization_ablation_20260324/current_matching_applicability.png`
-- `scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png`
-- `scripts/results_regularization_ablation_20260324/current_matching_checkpoint_curve_cryptos.png`
-- `scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.png`
-- `scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.pdf`
-- `scripts/results_regularization_ablation_20260324/structured_regularization_ablation_2x2.pdf`
+- `results/regularization_ablation/structured_conditional_regularization_ablation.md`
+- `results/regularization_ablation/structured_conditional_regularization_ablation.json`
+- `results/regularization_ablation/causal_ot_applicability.png`
+- `results/regularization_ablation/current_matching_applicability.png`
+- `results/regularization_ablation/causal_ot_checkpoint_curve_cryptos.png`
+- `results/regularization_ablation/current_matching_checkpoint_curve_cryptos.png`
+- `results/regularization_ablation/regularization_training_delta_20k.png`
+- `results/regularization_ablation/regularization_training_delta_20k.pdf`
+- `results/regularization_ablation/structured_regularization_ablation_2x2.pdf`
+
+Training-curve inputs are stored in stable per-dataset directories:
+
+- `results/regularization_ablation/training_curve_cryptos_20k/`
+- `results/regularization_ablation/training_curve_synthetic_20k/`
+- `results/regularization_ablation/training_curve_optiver_20k/`
+- `results/regularization_ablation/training_curve_es_mbp_10_20k/`
 
 Pilot figures:
 
-![History-local causal OT applicability](scripts/results_regularization_ablation_20260324/causal_ot_applicability.png)
+![History-local causal OT applicability](results/regularization_ablation/causal_ot_applicability.png)
 
-![Conditional current matching applicability](scripts/results_regularization_ablation_20260324/current_matching_applicability.png)
+![Conditional current matching applicability](results/regularization_ablation/current_matching_applicability.png)
 
-![Causal OT checkpoint curve on cryptos](scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png)
+![Causal OT checkpoint curve on cryptos](results/regularization_ablation/causal_ot_checkpoint_curve_cryptos.png)
 
-![Conditional current matching checkpoint curve on cryptos](scripts/results_regularization_ablation_20260324/current_matching_checkpoint_curve_cryptos.png)
+![Conditional current matching checkpoint curve on cryptos](results/regularization_ablation/current_matching_checkpoint_curve_cryptos.png)
 
-![20k regularization training deltas](scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.png)
+![20k regularization training deltas](results/regularization_ablation/regularization_training_delta_20k.png)

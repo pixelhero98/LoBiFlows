@@ -89,7 +89,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--seeds", type=str, default="0,1,2")
     ap.add_argument("--checkpoints", type=str, default="1000,2000,4000,8000,12000")
     ap.add_argument("--variants", type=str, default="baseline_fm,local_causal_ot,conditional_current_matching")
-    ap.add_argument("--out_root", type=str, default="results_regularization_training_curve")
+    ap.add_argument("--out_root", type=str, default="results/regularization_training_curve")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--dataset_seed", type=int, default=0)
     ap.add_argument("--log_every", type=int, default=200)

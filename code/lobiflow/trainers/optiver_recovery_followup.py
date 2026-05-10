@@ -65,7 +65,7 @@ class Candidate:
 
 def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Run targeted Optiver recovery experiments for LoBiFlow.")
-    ap.add_argument("--out_root", type=str, default="results_optiver_recovery_followup")
+    ap.add_argument("--out_root", type=str, default="results/optiver_recovery_followup")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--optiver_path", type=str, default="")
     ap.add_argument("--dataset_seed", type=int, default=0)

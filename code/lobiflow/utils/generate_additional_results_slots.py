@@ -12,19 +12,19 @@ from pathlib import Path
 from PIL import Image, ImageDraw, ImageFont
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = SCRIPT_DIR / "results_additional_results_slots_20260409"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+OUTPUT_DIR = REPO_ROOT / "results" / "additional_results_slots"
 MERGED_CATALOG_PATH = (
-    SCRIPT_DIR
-    / "results_model_metric_catalogs_20260316"
+    REPO_ROOT
+    / "results" / "model_metric_catalogs"
     / "all_models_metric_catalog.json"
 )
 OPTIVER_RESMLP_SUMMARY_PATH = (
-    SCRIPT_DIR
-    / "results_optiver_resmlp_confirm_20260331"
+    REPO_ROOT
+    / "results" / "optiver_resmlp_confirm"
     / "overall_summary.json"
 )
-REG_ABLATION_DIR = SCRIPT_DIR / "results_regularization_ablation_20260324"
+REG_ABLATION_DIR = REPO_ROOT / "results" / "regularization_ablation"
 
 SLOT1_PATH = OUTPUT_DIR / "slot1_lobiflow_variant_ablation.tex"
 SLOT2_IMAGE_PATH = OUTPUT_DIR / "slot2_regularization_diagnostics.png"
@@ -119,7 +119,7 @@ def _render_slot1_table(rows: list[dict]) -> str:
             best[(dataset, metric)] = chooser(candidates, key=lambda item: item[1])[0]
 
     lines = [
-        "% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json; do not hand-edit.",
+        "% Generated from results/model_metric_catalogs/all_models_metric_catalog.json; do not hand-edit.",
         r"\begin{table}[t]",
         r"\centering",
         r"\caption{Internal LoBiFlow variant ablation using macro-over-horizon test means. Lower is better for both metrics. The published LoBiFlow presets are justified by this quality--efficiency tradeoff across datasets.}",
@@ -174,7 +174,7 @@ def _render_slot3_table(summary: dict) -> str:
             best[(nfe, metric_key)] = chooser(candidates, key=lambda item: item[1])[0]
 
     lines = [
-        "% Generated from scripts/results_optiver_resmlp_confirm_20260331/overall_summary.json; do not hand-edit.",
+        "% Generated from results/optiver_resmlp_confirm/overall_summary.json; do not hand-edit.",
         r"\begin{table}[t]",
         r"\centering",
         r"\caption{Optiver efficiency path from a lighter velocity field. Numbers are 3-seed means; lower is better for all metrics. A ResMLP field gives a substantial speedup while remaining competitive with the transformer-field anchor.}",
@@ -219,7 +219,7 @@ def _render_slot3_table(summary: dict) -> str:
 def _render_slot2_figure_tex() -> str:
     return "\n".join(
         [
-            "% Generated from results_regularization_ablation_20260324 figure assets; do not hand-edit.",
+            "% Generated from results/regularization_ablation figure assets; do not hand-edit.",
             r"\begin{figure}[t]",
             r"\centering",
             r"\includegraphics[width=\columnwidth]{slot2_regularization_diagnostics.png}",
@@ -279,9 +279,9 @@ def _write_readme() -> None:
             "",
             "Sources:",
             "",
-            "- `results_model_metric_catalogs_20260316/all_models_metric_catalog.json`",
-            "- `results_optiver_resmlp_confirm_20260331/overall_summary.json`",
-            "- `results_regularization_ablation_20260324/*.png`",
+            "- `results/model_metric_catalogs/all_models_metric_catalog.json`",
+            "- `results/optiver_resmlp_confirm/overall_summary.json`",
+            "- `results/regularization_ablation/*.png`",
             "",
         ]
     )

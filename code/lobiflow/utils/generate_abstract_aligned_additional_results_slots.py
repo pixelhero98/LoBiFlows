@@ -10,21 +10,21 @@ import shutil
 from pathlib import Path
 
 
-SCRIPT_DIR = Path(__file__).resolve().parent
-OUTPUT_DIR = SCRIPT_DIR / "results_additional_results_slots_abstract_aligned_20260409"
+REPO_ROOT = Path(__file__).resolve().parents[3]
+OUTPUT_DIR = REPO_ROOT / "results" / "additional_results_slots_abstract_aligned"
 MERGED_CATALOG_PATH = (
-    SCRIPT_DIR
-    / "results_model_metric_catalogs_20260316"
+    REPO_ROOT
+    / "results" / "model_metric_catalogs"
     / "all_models_metric_catalog.json"
 )
 PAPER_READY_SUMMARY_PATH = (
-    SCRIPT_DIR
-    / "results_benchmark_lobiflow_paper_ready_20260315"
+    REPO_ROOT
+    / "results" / "benchmark_lobiflow_paper_ready"
     / "overall_summary.json"
 )
 REG_ABLATION_JSON_PATH = (
-    SCRIPT_DIR
-    / "results_regularization_ablation_20260324"
+    REPO_ROOT
+    / "results" / "regularization_ablation"
     / "structured_conditional_regularization_ablation.json"
 )
 
@@ -199,8 +199,8 @@ def _build_efficiency_table(catalog_rows: list[dict], summary: dict) -> str:
         "Scores are macro-over-horizon test means; lower is better. NFE is reported for the LoBiFlow presets only."
     )
     return (
-        "% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json and "
-        "scripts/results_benchmark_lobiflow_paper_ready_20260315/overall_summary.json; do not hand-edit.\n"
+        "% Generated from results/model_metric_catalogs/all_models_metric_catalog.json and "
+        "results/benchmark_lobiflow_paper_ready/overall_summary.json; do not hand-edit.\n"
         + _latex_table(caption, "tab:efficiency-tradeoff", body, wide=True)
     )
 
@@ -250,7 +250,7 @@ def _make_causal_ot_figure(data: dict) -> tuple[str, str]:
     plt.close(fig)
 
     tex = (
-        "% Generated from scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json; do not hand-edit.\n"
+        "% Generated from results/regularization_ablation/structured_conditional_regularization_ablation.json; do not hand-edit.\n"
         + _latex_figure(
             "slot2_causal_ot_results.pdf",
             "History-local causal OT on cryptos. Top: checkpoint sweep of score_main across training steps. Bottom: applicability diagnostic across datasets.",
@@ -319,7 +319,7 @@ def _make_current_matching_figure(data: dict) -> tuple[str, str]:
     plt.close(fig)
 
     tex = (
-        "% Generated from scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json; do not hand-edit.\n"
+        "% Generated from results/regularization_ablation/structured_conditional_regularization_ablation.json; do not hand-edit.\n"
         + _latex_figure(
             "slot3_current_matching_results.pdf",
             "Conditional current matching on cryptos using the measured checkpoint sweep and dataset-level applicability diagnostic.",
@@ -342,9 +342,9 @@ def _write_readme() -> None:
             "",
             "Sources:",
             "",
-            "- `results_model_metric_catalogs_20260316/all_models_metric_catalog.json`",
-            "- `results_benchmark_lobiflow_paper_ready_20260315/overall_summary.json`",
-            "- `results_regularization_ablation_20260324/structured_conditional_regularization_ablation.json`",
+            "- `results/model_metric_catalogs/all_models_metric_catalog.json`",
+            "- `results/benchmark_lobiflow_paper_ready/overall_summary.json`",
+            "- `results/regularization_ablation/structured_conditional_regularization_ablation.json`",
             "",
         ]
     )

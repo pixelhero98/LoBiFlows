@@ -9,6 +9,6 @@ Generated artifacts for the three single-column additional-results slots:
 
 Sources:
 
-- `results_model_metric_catalogs_20260316/all_models_metric_catalog.json`
-- `results_optiver_resmlp_confirm_20260331/overall_summary.json`
-- `results_regularization_ablation_20260324/*.png`
+- `results/model_metric_catalogs/all_models_metric_catalog.json`
+- `results/optiver_resmlp_confirm/overall_summary.json`
+- `results/regularization_ablation/*.png`

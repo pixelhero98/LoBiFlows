@@ -98,7 +98,7 @@ def build_argparser() -> argparse.ArgumentParser:
     ap.add_argument("--data_path", type=str, default="")
     ap.add_argument("--synthetic_length", type=int, default=DEFAULT_SYNTHETIC_LENGTH)
 
-    ap.add_argument("--out_dir", type=str, default="results_loss_term_sweep")
+    ap.add_argument("--out_dir", type=str, default="results/loss_term_sweep")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
 

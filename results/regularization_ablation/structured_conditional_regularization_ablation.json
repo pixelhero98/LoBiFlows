@@ -468,7 +468,7 @@
       }
     },
     "checkpoint_sweep_cryptos_3seed_meta": {
-      "source_path": "results_regularization_ablation_20260324/regularization_training_curve_cryptos_20k_20260508",
+      "source_path": "results/regularization_ablation/training_curve_cryptos_20k",
       "seeds": [
         0,
         1,
@@ -934,17 +934,17 @@
     ],
     "eval_windows": 20,
     "result_dirs": {
-      "cryptos": "results_regularization_ablation_20260324/regularization_training_curve_cryptos_20k_20260508",
-      "synthetic": "results_regularization_ablation_20260324/regularization_training_curve_synthetic_20k_20260509",
-      "optiver": "results_regularization_ablation_20260324/regularization_training_curve_optiver_20k_20260509",
-      "es_mbp_10": "results_regularization_ablation_20260324/regularization_training_curve_es_mbp_10_20k_20260509"
+      "cryptos": "results/regularization_ablation/training_curve_cryptos_20k",
+      "synthetic": "results/regularization_ablation/training_curve_synthetic_20k",
+      "optiver": "results/regularization_ablation/training_curve_optiver_20k",
+      "es_mbp_10": "results/regularization_ablation/training_curve_es_mbp_10_20k"
     }
   },
   "training_curve_20k": [
     {
       "dataset": "cryptos",
       "label": "Cryptos",
-      "source_path": "results_regularization_ablation_20260324/regularization_training_curve_cryptos_20k_20260508",
+      "source_path": "results/regularization_ablation/training_curve_cryptos_20k",
       "horizons": [
         60,
         300,
@@ -1322,7 +1322,7 @@
     {
       "dataset": "synthetic",
       "label": "Synthetic",
-      "source_path": "results_regularization_ablation_20260324/regularization_training_curve_synthetic_20k_20260509",
+      "source_path": "results/regularization_ablation/training_curve_synthetic_20k",
       "horizons": [
         60,
         300,
@@ -1700,7 +1700,7 @@
     {
       "dataset": "optiver",
       "label": "Optiver",
-      "source_path": "results_regularization_ablation_20260324/regularization_training_curve_optiver_20k_20260509",
+      "source_path": "results/regularization_ablation/training_curve_optiver_20k",
       "horizons": [
         60,
         300,
@@ -2078,7 +2078,7 @@
     {
       "dataset": "es_mbp_10",
       "label": "ES MBP-10",
-      "source_path": "results_regularization_ablation_20260324/regularization_training_curve_es_mbp_10_20k_20260509",
+      "source_path": "results/regularization_ablation/training_curve_es_mbp_10_20k",
       "horizons": [
         60,
         300,

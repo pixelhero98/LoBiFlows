@@ -130,7 +130,7 @@ DATASET_PLANS: Mapping[str, DatasetPlan] = {
 def build_argparser() -> argparse.ArgumentParser:
     ap = argparse.ArgumentParser(description="Tune and benchmark the current LoBiFlow baseline.")
     ap.add_argument("--datasets", type=str, default="synthetic,optiver,cryptos,es_mbp_10")
-    ap.add_argument("--out_root", type=str, default="results_benchmark_lobiflow_suite")
+    ap.add_argument("--out_root", type=str, default="results/benchmark_lobiflow_suite")
     ap.add_argument("--device", type=str, default="cuda" if torch.cuda.is_available() else "cpu")
     ap.add_argument("--seeds", type=str, default="0,1,2", help="Model/training seeds.")
     ap.add_argument("--dataset_seed", type=int, default=0, help="Synthetic data seed; fixed across model seeds.")

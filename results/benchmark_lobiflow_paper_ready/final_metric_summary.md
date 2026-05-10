@@ -38,8 +38,8 @@ Best baseline on `score_main` for each dataset:
 
 The full `4` primary + `7` diagnostic metrics are stored in:
 
-- `scripts/results_benchmark_lobiflow_paper_ready_20260315/metric_catalog.csv`
-- `scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.csv`
+- `results/benchmark_lobiflow_paper_ready/metric_catalog.csv`
+- `results/model_metric_catalogs/all_models_metric_catalog.csv`
 
 These CSVs are the main comparison entry points for:
 

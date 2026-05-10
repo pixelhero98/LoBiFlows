@@ -25,6 +25,6 @@
     "local_causal_ot",
     "conditional_current_matching"
   ],
-  "rows_path": "results_regularization_ablation_20260324/regularization_training_curve_es_mbp_10_20k_20260509/rows.json",
-  "summary_path": "results_regularization_ablation_20260324/regularization_training_curve_es_mbp_10_20k_20260509/summary.json"
+  "rows_path": "results/regularization_ablation/training_curve_es_mbp_10_20k/rows.json",
+  "summary_path": "results/regularization_ablation/training_curve_es_mbp_10_20k/summary.json"
 }
