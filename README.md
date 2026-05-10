@@ -19,6 +19,35 @@ paper-ready evaluation.
 - Binance crypto LOB snapshots from Tardis
 - Databento ES futures MBP-10
 
+Prepared non-ES datasets are hosted at
+`pixelhero98/lobiflow` on Hugging Face. From the repository root:
+
+```bash
+pip install -U huggingface_hub
+hf download pixelhero98/lobiflow --repo-type dataset --local-dir .
+```
+
+This populates:
+
+- `scripts/data_cryptos/cryptos_binance_spot_monthly_1s_l10.npz`
+- `scripts/data_optiver/optiver_train_8stocks_l2.npz`
+- `scripts/data_synthetic/lobster_free_sample_profile_10.json`
+
+The ES-MBP-10 raw Databento cache is hosted separately at
+`pixelhero98/es-mbp-10`. Download the raw cache, then rebuild the processed
+NPZ used by the experiments:
+
+```bash
+pip install -U huggingface_hub databento pandas
+hf download pixelhero98/es-mbp-10 --repo-type dataset --include "scripts/data_databento/databento_cache/**" --local-dir .
+python scripts/prepare_databento.py --cache_root scripts/data_databento/databento_cache --output scripts/data_databento/es_mbp_10.npz
+```
+
+If a cached Databento day is missing, `prepare_databento.py` can fetch it when
+`DATABENTO_API_KEY` is set. The default ES request is `GLBX.MDP3`, schema
+`mbp-10`, symbol `ES.v.0`, continuous stype, `2026-02-10` to `2026-03-10`,
+sampled at 1 second.
+
 ## Verified Metrics
 
 Primary metrics:
@@ -47,6 +76,10 @@ ranking.
 - `scripts/benchmark_lobiflow_paper_ready.py`: final quality / speed / architecture benchmark
 - `scripts/export_model_metric_catalogs.py`: flat metric catalog export
 - `scripts/generate_final_metric_summary.py`: regenerate the published metric summary from the paper-ready catalogs
+- `scripts/generate_main_benchmark_latex_table.py`: regenerate the main paper LaTeX benchmark table from the merged benchmark catalog
+- `scripts/generate_additional_results_slots.py`: generate the three single-column additional-results slots for the paper body
+- `scripts/generate_abstract_aligned_additional_results_slots.py`: generate an alternative abstract-aligned three-slot bundle focused on efficiency and structured regularization outcomes
+- `scripts/regularization_training_curve.py`: reproduce structured-regularization training-step sweeps
 - `scripts/make_regularization_ablation_plots.py`: generate pilot ablation figures
 - `scripts/test_lobiflow.py`: smoke and regression suite
 
@@ -106,7 +139,7 @@ Published paper-ready quality presets:
 
 - `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
 - `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
-- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=1`
 - `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
 
 ## Final Outputs
@@ -116,6 +149,8 @@ Paper-ready benchmark outputs are written under:
 - `scripts/results_benchmark_lobiflow_paper_ready_20260315`
 - `scripts/results_model_metric_catalogs_20260316`
 - `scripts/results_regularization_ablation_20260324`
+- `scripts/results_additional_results_slots_20260409`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409`
 
 The flat CSVs in `results_model_metric_catalogs_20260316` are the easiest entry
 point for comparing LoBiFlow against all baselines.
@@ -123,6 +158,15 @@ point for comparing LoBiFlow against all baselines.
 Key summaries:
 
 - `scripts/results_benchmark_lobiflow_paper_ready_20260315/final_metric_summary.md`
+- `scripts/results_benchmark_lobiflow_paper_ready_20260315/main_benchmark_table.tex`
+- `scripts/results_additional_results_slots_20260409/slot1_lobiflow_variant_ablation.tex`
+- `scripts/results_additional_results_slots_20260409/slot2_regularization_diagnostics.png`
+- `scripts/results_additional_results_slots_20260409/slot3_optiver_field_efficiency.tex`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot1_efficiency_tradeoff.tex`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot2_causal_ot_results.pdf`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot2_causal_ot_results.tex`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot3_current_matching_results.pdf`
+- `scripts/results_additional_results_slots_abstract_aligned_20260409/slot3_current_matching_results.tex`
 - `scripts/results_regularization_ablation_20260324/structured_conditional_regularization_ablation.md`
 
 ## Structured Conditional Regularization Ablation
@@ -141,7 +185,7 @@ The conclusion is narrow but useful:
 - none of these regularizers replaced the accepted final LoBiFlow defaults
 - history-local causal OT was the strongest candidate
 - its benefits were dataset-specific and strongest on `cryptos`
-- the effect was largest at shorter optimization budgets and weakened later
+- the fresh 20k sweep shows both local causal OT and conditional current matching help `cryptos`, but not the other three datasets
 
 The detailed summary and supporting diagnostics are in:
 
@@ -150,6 +194,10 @@ The detailed summary and supporting diagnostics are in:
 - `scripts/results_regularization_ablation_20260324/causal_ot_applicability.png`
 - `scripts/results_regularization_ablation_20260324/current_matching_applicability.png`
 - `scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png`
+- `scripts/results_regularization_ablation_20260324/current_matching_checkpoint_curve_cryptos.png`
+- `scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.png`
+- `scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.pdf`
+- `scripts/results_regularization_ablation_20260324/structured_regularization_ablation_2x2.pdf`
 
 Pilot figures:
 
@@ -158,3 +206,7 @@ Pilot figures:
 ![Conditional current matching applicability](scripts/results_regularization_ablation_20260324/current_matching_applicability.png)
 
 ![Causal OT checkpoint curve on cryptos](scripts/results_regularization_ablation_20260324/causal_ot_checkpoint_curve_cryptos.png)
+
+![Conditional current matching checkpoint curve on cryptos](scripts/results_regularization_ablation_20260324/current_matching_checkpoint_curve_cryptos.png)
+
+![20k regularization training deltas](scripts/results_regularization_ablation_20260324/regularization_training_delta_20k.png)

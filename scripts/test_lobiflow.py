@@ -317,6 +317,36 @@ def test_databento_day_schedule():
     ]
 
 
+def test_databento_cache_replay_requires_key_only_when_missing():
+    from datetime import date
+    from tempfile import TemporaryDirectory
+    from prepare_databento import DayRequest, _load_or_download_day
+
+    request = DayRequest(
+        day=date(2026, 2, 10),
+        start="2026-02-10T00:00:00",
+        end="2026-02-11T00:00:00",
+    )
+    with TemporaryDirectory() as cache_root:
+        try:
+            _load_or_download_day(
+                client=None,
+                db_module=object(),
+                dataset="GLBX.MDP3",
+                schema="mbp-10",
+                symbol="ES.v.0",
+                stype_in="continuous",
+                request=request,
+                cache_root=cache_root,
+            )
+        except FileNotFoundError as exc:
+            message = str(exc)
+            assert "Hugging Face" in message
+            assert "DATABENTO_API_KEY" in message
+        else:
+            raise AssertionError("missing cache without API key should fail clearly")
+
+
 def test_databento_default_dataset_path():
     from lob_datasets import default_es_mbp_10_npz_path
 
@@ -880,6 +910,146 @@ def test_loss_new_terms_combined():
     grad_count = sum(1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0)
     assert grad_count > 0, "Gradients should flow to model parameters"
 
+
+def test_structured_regularization_config_overrides():
+    from argparse import Namespace
+    from experiment_common import build_cfg_from_args
+
+    args = Namespace(
+        device="cpu",
+        levels=2,
+        history_len=8,
+        batch_size=4,
+        lr=1e-3,
+        weight_decay=0.0,
+        grad_clip=1.0,
+        standardize=True,
+        use_cond_features=False,
+        cond_standardize=True,
+        hidden_dim=16,
+        lambda_causal_ot=0.01,
+        causal_ot_horizon=3,
+        causal_ot_history_weight=0.1,
+        causal_ot_k_neighbors=2,
+        causal_ot_rollout_nfe=1,
+        lambda_current_match=0.0005,
+        current_match_horizon=4,
+        current_match_k_neighbors=2,
+        current_match_rollout_nfe=1,
+        current_match_var_eps=1e-3,
+        current_match_global_shrink=0.5,
+        current_match_huber_delta=1.0,
+        current_match_pair_mode="selected",
+        ctx_pool_scales="",
+        cond_depths="",
+        cond_vol_window=None,
+    )
+    cfg = build_cfg_from_args(args)
+    assert cfg.lambda_causal_ot == 0.01
+    assert cfg.causal_ot_horizon == 3
+    assert cfg.lambda_current_match == 0.0005
+    assert cfg.current_match_horizon == 4
+    assert cfg.current_match_pair_mode == "selected"
+
+
+def test_current_matching_loss_with_future_trajectories():
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+
+    cfg = LOBConfig(
+        levels=2,
+        history_len=8,
+        hidden_dim=16,
+        cond_dim=0,
+        use_minibatch_ot=False,
+        lambda_current_match=0.0005,
+        current_match_horizon=4,
+        current_match_k_neighbors=2,
+        current_match_rollout_nfe=1,
+    )
+    model = LoBiFlow(cfg)
+    hist = torch.randn(4, cfg.history_len, cfg.state_dim)
+    tgt = torch.randn(4, cfg.state_dim)
+    fut = torch.randn(4, 4, cfg.state_dim)
+    loss, logs = model.loss(tgt, hist, fut=fut)
+    assert torch.isfinite(loss)
+    assert logs["current_match_horizon"] == 4.0
+    assert logs["current_match_num_stats"] > 0.0
+    loss.backward()
+    grad_count = sum(1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0)
+    assert grad_count > 0
+
+
+def test_causal_ot_loss_with_future_trajectories():
+    from lob_baselines import LOBConfig
+    from lob_model import LoBiFlow
+
+    cfg = LOBConfig(
+        levels=2,
+        history_len=8,
+        hidden_dim=16,
+        cond_dim=0,
+        use_minibatch_ot=False,
+        lambda_causal_ot=0.01,
+        causal_ot_horizon=3,
+        causal_ot_history_weight=0.1,
+        causal_ot_k_neighbors=2,
+        causal_ot_rollout_nfe=1,
+    )
+    model = LoBiFlow(cfg)
+    hist = torch.randn(4, cfg.history_len, cfg.state_dim)
+    tgt = torch.randn(4, cfg.state_dim)
+    fut = torch.randn(4, 3, cfg.state_dim)
+    loss, logs = model.loss(tgt, hist, fut=fut)
+    assert torch.isfinite(loss)
+    assert logs["causal_ot_horizon"] == 3.0
+    assert logs["causal_ot_support_frac"] > 0.0
+    loss.backward()
+    grad_count = sum(1 for p in model.parameters() if p.grad is not None and p.grad.abs().sum() > 0)
+    assert grad_count > 0
+
+
+def test_regularization_training_curve_smoke(tmp_path):
+    import subprocess
+    from pathlib import Path
+
+    script_dir = Path(__file__).resolve().parent
+    out_root = tmp_path / "regularization_smoke"
+    cmd = [
+        sys.executable,
+        "regularization_training_curve.py",
+        "--dataset",
+        "synthetic",
+        "--variants",
+        "conditional_current_matching",
+        "--seeds",
+        "0",
+        "--checkpoints",
+        "1",
+        "--out_root",
+        str(out_root),
+        "--device",
+        "cpu",
+        "--synthetic_length",
+        "400",
+        "--horizons",
+        "1",
+        "--eval_windows",
+        "1",
+        "--hidden_dim",
+        "16",
+        "--fu_net_layers",
+        "1",
+        "--log_every",
+        "1",
+    ]
+    result = subprocess.run(cmd, cwd=script_dir, check=False, capture_output=True, text=True, timeout=120)
+    assert result.returncode == 0, result.stderr + "\n" + result.stdout
+    assert (out_root / "rows.csv").exists()
+    assert (out_root / "summary.json").exists()
+    assert (out_root / "manifest.json").exists()
+
+
 def test_train_loop_short():
     from lob_baselines import LOBConfig
     from lob_datasets import build_dataset_splits_synthetic
@@ -964,6 +1134,7 @@ def main():
         ("crypto_month_schedule", test_crypto_month_schedule),
         ("crypto_bucket_downsample", test_crypto_bucket_downsample),
         ("databento_day_schedule", test_databento_day_schedule),
+        ("databento_cache_replay_requires_key_only_when_missing", test_databento_cache_replay_requires_key_only_when_missing),
         ("databento_default_dataset_path", test_databento_default_dataset_path),
         ("optiver_default_dataset_path", test_optiver_default_dataset_path),
         ("databento_segment_downsample_shapes", test_databento_segment_downsample_shapes),
@@ -991,6 +1162,9 @@ def main():
         ("imbalance_loss", test_imbalance_loss),
         ("consistency_loss", test_consistency_loss),
         ("loss_new_terms_combined", test_loss_new_terms_combined),
+        ("structured_regularization_config_overrides", test_structured_regularization_config_overrides),
+        ("current_matching_loss_with_future_trajectories", test_current_matching_loss_with_future_trajectories),
+        ("causal_ot_loss_with_future_trajectories", test_causal_ot_loss_with_future_trajectories),
         ("train_loop_short", test_train_loop_short),
         ("eval_pipeline", test_eval_pipeline),
         ("utils", test_utils),

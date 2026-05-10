@@ -248,6 +248,15 @@ def build_cond_features(params_raw: np.ndarray, mids: np.ndarray, cfg: LOBConfig
     return cond
 
 
+def _future_horizon_from_cfg(cfg: LOBConfig) -> int:
+    required = 0
+    if float(getattr(cfg.fm, "lambda_causal_ot", 0.0)) > 0.0:
+        required = max(required, int(getattr(cfg.fm, "causal_ot_horizon", 0)))
+    if float(getattr(cfg.fm, "lambda_current_match", 0.0)) > 0.0:
+        required = max(required, int(getattr(cfg.fm, "current_match_horizon", 0)))
+    return int(max(0, required))
+
+
 # -----------------------------
 # Dataset
 # -----------------------------
@@ -392,7 +401,7 @@ def _build_windowed_dataset(params_raw: np.ndarray, mids: np.ndarray, cfg: LOBCo
         stride=stride,
         params_mean=mu,
         params_std=sig,
-        future_horizon=0,  # LoBiFlow uses 1-step; rollout losses can be added later
+        future_horizon=_future_horizon_from_cfg(cfg),
         cond=cond,
         cond_mean=c_mu,
         cond_std=c_sig,
@@ -741,7 +750,7 @@ def _make_windowed_dataset_from_arrays(
         stride=stride,
         params_mean=params_mean,
         params_std=params_std,
-        future_horizon=0,
+        future_horizon=_future_horizon_from_cfg(cfg),
         cond=cond_seg,
         cond_mean=cond_mean,
         cond_std=cond_std,

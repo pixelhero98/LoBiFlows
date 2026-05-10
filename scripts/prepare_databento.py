@@ -150,6 +150,13 @@ def _load_or_download_day(
     if cache_path.exists() and cache_path.stat().st_size > 0:
         return db_module.DBNStore.from_file(str(cache_path))
 
+    if client is None:
+        raise FileNotFoundError(
+            "Missing cached Databento DBN file and no Databento API key was provided: "
+            f"{cache_path}. Download the ES-MBP-10 cache from Hugging Face into "
+            f"{cache_root}, or set DATABENTO_API_KEY to fetch the missing day."
+        )
+
     cache_path.parent.mkdir(parents=True, exist_ok=True)
     for attempt in range(1, max_retries + 1):
         try:
@@ -250,7 +257,7 @@ def prepare_databento_es_mbp_10(
     fm = L2FeatureMap(levels=levels, eps=cfg.eps)
     min_rows = int(min_rows_per_segment or (history_len + 32))
     db = _import_databento()
-    client = db.Historical(api_key)
+    client = db.Historical(api_key) if api_key else None
 
     ask_p_all: List[np.ndarray] = []
     ask_v_all: List[np.ndarray] = []
@@ -398,8 +405,6 @@ def main() -> None:
 
     args = build_argparser().parse_args()
     api_key = args.api_key or os.environ.get("DATABENTO_API_KEY", "")
-    if not api_key:
-        raise SystemExit("Databento API key is required via --api_key or DATABENTO_API_KEY.")
 
     summary = prepare_databento_es_mbp_10(
         api_key=api_key,

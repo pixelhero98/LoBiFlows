@@ -258,6 +258,275 @@ class LoBiFlow(RectifiedFlowLOB):
         vol_viol = F.relu(min_positive - bid_v) + F.relu(min_positive - ask_v)
         return spread_viol.mean() + vol_viol.mean()
 
+    def _causal_ot_horizon(self) -> int:
+        return int(max(0, int(getattr(self.cfg.fm, "causal_ot_horizon", 0))))
+
+    def _causal_ot_rollout_nfe(self) -> int:
+        return int(max(1, int(getattr(self.cfg.fm, "causal_ot_rollout_nfe", 1))))
+
+    def _causal_ot_k_neighbors(self) -> int:
+        return int(max(0, int(getattr(self.cfg.fm, "causal_ot_k_neighbors", 0))))
+
+    def _current_match_horizon(self) -> int:
+        return int(max(0, int(getattr(self.cfg.fm, "current_match_horizon", 0))))
+
+    def _current_match_k_neighbors(self) -> int:
+        return int(max(0, int(getattr(self.cfg.fm, "current_match_k_neighbors", 0))))
+
+    def _current_match_rollout_nfe(self) -> int:
+        return int(max(1, int(getattr(self.cfg.fm, "current_match_rollout_nfe", 1))))
+
+    def _core_path_features(self, seq: torch.Tensor) -> torch.Tensor:
+        batch, steps, dim = seq.shape
+        raw = self._denormalize_params(seq.reshape(batch * steps, dim)).reshape(batch, steps, dim)
+        levels = int(self.cfg.data.levels)
+        eps = float(self.cfg.train.eps)
+
+        delta_mid = raw[..., 0:1]
+        log_spread = raw[..., 1:2]
+        vol_start = 2 + 2 * max(0, levels - 1)
+        ask_log_v = raw[..., vol_start : vol_start + levels]
+        bid_log_v = raw[..., vol_start + levels : vol_start + 2 * levels]
+        ask_v = ask_log_v.exp()
+        bid_v = bid_log_v.exp()
+        depth = ask_v.sum(dim=-1, keepdim=True) + bid_v.sum(dim=-1, keepdim=True)
+        imbalance = (bid_v.sum(dim=-1, keepdim=True) - ask_v.sum(dim=-1, keepdim=True)) / (depth + eps)
+        return torch.cat([delta_mid, log_spread, depth.log(), imbalance], dim=-1)
+
+    def _path_summary_from_features(self, feat: torch.Tensor) -> torch.Tensor:
+        mean_feat = feat.mean(dim=1)
+        std_feat = feat.std(dim=1, unbiased=False)
+        last_feat = feat[:, -1, :]
+        return torch.cat([last_feat, mean_feat, std_feat], dim=-1)
+
+    def _history_summary(self, hist: torch.Tensor) -> torch.Tensor:
+        return self._path_summary_from_features(self._core_path_features(hist))
+
+    def _current_match_feature_sequence(self, fut: torch.Tensor) -> torch.Tensor:
+        feat = self._core_path_features(fut)
+        zeros = torch.zeros_like(feat[:, :1, :])
+        delta_feat = torch.cat([zeros, feat[:, 1:, :] - feat[:, :-1, :]], dim=1)
+        return torch.cat(
+            [
+                feat[..., 0:1],
+                feat[..., 3:4],
+                delta_feat[..., 1:2],
+                delta_feat[..., 2:3],
+                delta_feat[..., 3:4],
+            ],
+            dim=-1,
+        )
+
+    def _current_match_pair_indices(self, channels: int, device: torch.device) -> Tuple[torch.Tensor, torch.Tensor]:
+        if channels <= 1:
+            empty = torch.empty(0, dtype=torch.long, device=device)
+            return empty, empty
+
+        pair_mode = str(getattr(self.cfg.fm, "current_match_pair_mode", "selected")).strip().lower()
+        if pair_mode == "all":
+            return torch.triu_indices(channels, channels, offset=1, device=device)
+
+        preferred_pairs = (
+            (0, 1),
+            (0, 2),
+            (0, 4),
+            (1, 2),
+            (1, 4),
+            (2, 4),
+        )
+        valid_pairs = [(i, j) for i, j in preferred_pairs if i < channels and j < channels]
+        if not valid_pairs:
+            return torch.triu_indices(channels, channels, offset=1, device=device)
+        tri_i = torch.tensor([i for i, _ in valid_pairs], dtype=torch.long, device=device)
+        tri_j = torch.tensor([j for _, j in valid_pairs], dtype=torch.long, device=device)
+        return tri_i, tri_j
+
+    def _antisymmetric_current_stat(self, feat: torch.Tensor) -> torch.Tensor:
+        batch_size, steps, channels = feat.shape
+        tri_i, tri_j = self._current_match_pair_indices(channels, feat.device)
+        num_stats = int(tri_i.numel())
+        if steps <= 1 or num_stats <= 0:
+            return feat.new_zeros(batch_size, num_stats)
+        forward = torch.einsum("bti,btj->bij", feat[:, :-1, :], feat[:, 1:, :])
+        anti = forward - forward.transpose(1, 2)
+        return anti[:, tri_i, tri_j]
+
+    def _training_rollout(
+        self,
+        hist: torch.Tensor,
+        *,
+        steps: int,
+        cond: Optional[torch.Tensor],
+        nfe: int,
+    ) -> torch.Tensor:
+        batch_size, history_len, state_dim = hist.shape
+        x_hist = hist
+        out = []
+        inner_steps = int(max(1, nfe))
+        dt = 1.0 / float(inner_steps)
+        for _ in range(int(steps)):
+            x = torch.randn(batch_size, state_dim, device=hist.device, dtype=hist.dtype)
+            for step_idx in range(inner_steps):
+                t_cur = float(step_idx) / float(inner_steps)
+                t = torch.full((batch_size, 1), t_cur, device=hist.device, dtype=hist.dtype)
+                v = self.v_forward(x, t, x_hist, cond=cond)
+                x = x + dt * v
+            x_next = x
+            out.append(x_next[:, None, :])
+            x_hist = torch.cat([x_hist, x_next[:, None, :]], dim=1)
+            x_hist = x_hist[:, -history_len:, :]
+        return torch.cat(out, dim=1)
+
+    def _history_neighbor_indices(
+        self,
+        hist_summary: torch.Tensor,
+        *,
+        k_neighbors: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        batch_size = hist_summary.shape[0]
+        if batch_size <= 1:
+            idx = torch.zeros(batch_size, 1, dtype=torch.long, device=hist_summary.device)
+            return idx, hist_summary.new_tensor(1.0)
+        if k_neighbors <= 0 or k_neighbors >= batch_size:
+            idx = torch.arange(batch_size, device=hist_summary.device, dtype=torch.long)
+            idx = idx.unsqueeze(0).expand(batch_size, batch_size)
+            return idx, hist_summary.new_tensor(1.0)
+
+        hist_cost = torch.cdist(hist_summary.detach(), hist_summary.detach(), p=2).pow(2)
+        _, idx = torch.topk(hist_cost, k=int(k_neighbors), dim=1, largest=False)
+        support_frac = hist_summary.new_tensor(float(idx.shape[1]) / float(batch_size))
+        return idx, support_frac
+
+    def _restrict_cost_to_history_neighbors(
+        self,
+        total_cost: torch.Tensor,
+        hist_summary: torch.Tensor,
+        *,
+        k_neighbors: int,
+    ) -> Tuple[torch.Tensor, torch.Tensor]:
+        nn_idx, support_frac = self._history_neighbor_indices(hist_summary, k_neighbors=k_neighbors)
+        batch_size = total_cost.shape[0]
+        if nn_idx.shape[1] == batch_size:
+            return total_cost, support_frac
+
+        allowed = torch.zeros_like(total_cost, dtype=torch.bool)
+        allowed.scatter_(1, nn_idx, True)
+        diag_idx = torch.arange(batch_size, device=total_cost.device)
+        allowed[diag_idx, diag_idx] = True
+
+        penalty = float(total_cost.detach().max().cpu()) + 1.0
+        return total_cost.masked_fill(~allowed, penalty), support_frac
+
+    def _causal_ot_loss(
+        self,
+        hist: torch.Tensor,
+        fut: torch.Tensor,
+        *,
+        cond: Optional[torch.Tensor],
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        horizon = min(int(fut.shape[1]), self._causal_ot_horizon())
+        if horizon <= 0:
+            zero = hist.new_tensor(0.0)
+            return zero, {"causal_ot_cost": 0.0, "causal_ot_match_cost": 0.0, "causal_ot_support_frac": 1.0}
+
+        fut_target = fut[:, :horizon, :]
+        fut_gen = self._training_rollout(
+            hist,
+            steps=horizon,
+            cond=cond,
+            nfe=self._causal_ot_rollout_nfe(),
+        )
+
+        gen_feat = self._core_path_features(fut_gen)
+        tgt_feat = self._core_path_features(fut_target)
+        hist_summary = self._history_summary(hist)
+
+        gen_flat = gen_feat.reshape(gen_feat.shape[0], -1)
+        tgt_flat = tgt_feat.reshape(tgt_feat.shape[0], -1)
+        future_cost = torch.cdist(gen_flat, tgt_flat, p=2).pow(2) / max(1, gen_flat.shape[1])
+        history_cost = torch.cdist(hist_summary, hist_summary, p=2).pow(2) / max(1, hist_summary.shape[1])
+        history_weight = float(getattr(self.cfg.fm, "causal_ot_history_weight", 0.25))
+        total_cost = future_cost + history_weight * history_cost
+        total_cost, support_frac = self._restrict_cost_to_history_neighbors(
+            total_cost,
+            hist_summary,
+            k_neighbors=self._causal_ot_k_neighbors(),
+        )
+
+        if fut_gen.shape[0] > 1:
+            perm = _solve_linear_assignment(total_cost)
+            matched_fut = fut_target.index_select(0, perm)
+            matched_feat = tgt_feat.index_select(0, perm)
+            matched_cost = total_cost[torch.arange(total_cost.shape[0], device=total_cost.device), perm].mean()
+        else:
+            matched_fut = fut_target
+            matched_feat = tgt_feat
+            matched_cost = total_cost.mean()
+
+        loss_raw = F.mse_loss(fut_gen, matched_fut)
+        loss_feat = F.mse_loss(gen_feat, matched_feat)
+        total = 0.5 * (loss_raw + loss_feat)
+        return total, {
+            "causal_ot_cost": float(total.detach().cpu()),
+            "causal_ot_match_cost": float(matched_cost.detach().cpu()),
+            "causal_ot_support_frac": float(support_frac.detach().cpu()),
+        }
+
+    def _current_match_loss(
+        self,
+        hist: torch.Tensor,
+        fut: torch.Tensor,
+        *,
+        cond: Optional[torch.Tensor],
+    ) -> Tuple[torch.Tensor, Dict[str, float]]:
+        horizon = min(int(fut.shape[1]), self._current_match_horizon())
+        if horizon <= 1:
+            zero = hist.new_tensor(0.0)
+            return zero, {
+                "current_match_target_std": 0.0,
+                "current_match_support_frac": 1.0,
+                "current_match_global_shrink": 0.0,
+                "current_match_num_stats": 0.0,
+            }
+
+        fut_target = fut[:, :horizon, :]
+        fut_gen = self._training_rollout(
+            hist,
+            steps=horizon,
+            cond=cond,
+            nfe=self._current_match_rollout_nfe(),
+        )
+        hist_summary = self._history_summary(hist)
+        nn_idx, support_frac = self._history_neighbor_indices(
+            hist_summary,
+            k_neighbors=self._current_match_k_neighbors(),
+        )
+
+        real_curr = self._antisymmetric_current_stat(self._current_match_feature_sequence(fut_target))
+        gen_curr = self._antisymmetric_current_stat(self._current_match_feature_sequence(fut_gen))
+        local_real = real_curr[nn_idx]
+        local_mean = local_real.mean(dim=1).detach()
+        global_mean = real_curr.mean(dim=0, keepdim=True).expand_as(local_mean).detach()
+        shrink = float(getattr(self.cfg.fm, "current_match_global_shrink", 0.5))
+        shrink = min(max(shrink, 0.0), 1.0)
+        target_mean = (1.0 - shrink) * local_mean + shrink * global_mean
+        target_var = local_real.var(dim=1, unbiased=False).detach()
+        scale = torch.sqrt(target_var + float(getattr(self.cfg.fm, "current_match_var_eps", 1e-3)))
+        residual = (gen_curr - target_mean) / scale
+        huber_delta = max(float(getattr(self.cfg.fm, "current_match_huber_delta", 1.0)), 1e-6)
+        loss = F.huber_loss(
+            residual,
+            torch.zeros_like(residual),
+            reduction="mean",
+            delta=huber_delta,
+        )
+        return loss, {
+            "current_match_target_std": float(scale.mean().detach().cpu()),
+            "current_match_support_frac": float(support_frac.detach().cpu()),
+            "current_match_global_shrink": float(shrink),
+            "current_match_num_stats": float(gen_curr.shape[1]),
+        }
+
     def _consistency_loss(
         self,
         x_t: torch.Tensor,
@@ -329,12 +598,27 @@ class LoBiFlow(RectifiedFlowLOB):
             "physics": 0.0,
             "consistency": 0.0,
             "consistency_steps": 0.0,
+            "causal_ot": 0.0,
+            "causal_ot_horizon": 0.0,
+            "causal_ot_k_neighbors": float(self._causal_ot_k_neighbors()),
+            "causal_ot_rollout_nfe": float(self._causal_ot_rollout_nfe()),
+            "current_match": 0.0,
+            "current_match_horizon": 0.0,
+            "current_match_k_neighbors": float(self._current_match_k_neighbors()),
+            "current_match_rollout_nfe": float(self._current_match_rollout_nfe()),
             "ot_cost": float(ot_cost.detach().cpu()),
             "ot_used": float(bool(self.cfg.fm.use_minibatch_ot and batch_size > 1)),
             "meanflow_step_mean": float(h.mean().detach().cpu()),
             "meanflow_step_zero_frac": float((h <= 1e-8).float().mean().detach().cpu()),
             "meanflow_v_mse": float(F.mse_loss(u_pred, v_target).detach().cpu()),
             "loss": float(total.detach().cpu()),
+            "causal_ot_cost": 0.0,
+            "causal_ot_match_cost": 0.0,
+            "causal_ot_support_frac": 1.0,
+            "current_match_target_std": 0.0,
+            "current_match_support_frac": 1.0,
+            "current_match_global_shrink": 0.0,
+            "current_match_num_stats": 0.0,
         }
         return total, logs
 
@@ -369,13 +653,16 @@ class LoBiFlow(RectifiedFlowLOB):
         cond: Optional[torch.Tensor] = None,
         meta: Optional[Dict[str, Any]] = None,
     ) -> Tuple[torch.Tensor, Dict[str, float]]:
-        del fut
-
         if self._uses_average_velocity():
-            if float(self.cfg.fm.lambda_consistency) > 0.0 or float(self.cfg.fm.lambda_imbalance) > 0.0:
+            if (
+                float(self.cfg.fm.lambda_consistency) > 0.0
+                or float(self.cfg.fm.lambda_imbalance) > 0.0
+                or float(getattr(self.cfg.fm, "lambda_causal_ot", 0.0)) > 0.0
+                or float(getattr(self.cfg.fm, "lambda_current_match", 0.0)) > 0.0
+            ):
                 raise NotImplementedError(
                     "Average-velocity mode currently supports pure matching loss only; "
-                    "set lambda_consistency=lambda_imbalance=0."
+                    "set lambda_consistency=lambda_imbalance=lambda_causal_ot=lambda_current_match=0."
                 )
             return self._average_velocity_loss(x, hist, cond=cond)
 
@@ -392,6 +679,7 @@ class LoBiFlow(RectifiedFlowLOB):
         mid_prev = self._extract_mid_prev(meta, device=x.device, dtype=x.dtype)
         if mid_prev is not None:
             mid_prev = mid_prev.index_select(0, perm)
+        fut_target = None if fut is None else fut.index_select(0, perm)
         t = torch.rand(batch_size, 1, device=x.device)
         x_t = (1.0 - t) * z + t * x_target
         v_target = x_target - z
@@ -404,6 +692,8 @@ class LoBiFlow(RectifiedFlowLOB):
         w_mean = float(self.cfg.fm.lambda_mean)
         w_imb = float(self.cfg.fm.lambda_imbalance)
         w_cons = float(self.cfg.fm.lambda_consistency)
+        w_cot = float(getattr(self.cfg.fm, "lambda_causal_ot", 0.0))
+        w_current = float(getattr(self.cfg.fm, "lambda_current_match", 0.0))
 
         imbalance_loss = (
             self._imbalance_loss(x_pred, mid_prev=mid_prev)
@@ -424,10 +714,43 @@ class LoBiFlow(RectifiedFlowLOB):
                 steps=consistency_steps,
             )
 
+        causal_ot_loss = x.new_tensor(0.0)
+        causal_ot_logs = {
+            "causal_ot_cost": 0.0,
+            "causal_ot_match_cost": 0.0,
+            "causal_ot_support_frac": 1.0,
+        }
+        if w_cot > 0.0:
+            if fut_target is None:
+                raise ValueError("lambda_causal_ot > 0 requires dataset batches with future trajectories.")
+            causal_ot_loss, causal_ot_logs = self._causal_ot_loss(
+                hist=hist_target,
+                fut=fut_target,
+                cond=cond_target,
+            )
+
+        current_match_loss = x.new_tensor(0.0)
+        current_match_logs = {
+            "current_match_target_std": 0.0,
+            "current_match_support_frac": 1.0,
+            "current_match_global_shrink": 0.0,
+            "current_match_num_stats": 0.0,
+        }
+        if w_current > 0.0:
+            if fut_target is None:
+                raise ValueError("lambda_current_match > 0 requires dataset batches with future trajectories.")
+            current_match_loss, current_match_logs = self._current_match_loss(
+                hist=hist_target,
+                fut=fut_target,
+                cond=cond_target,
+            )
+
         total = (
             w_mean * mean_loss
             + w_imb * imbalance_loss
             + w_cons * consistency_loss
+            + w_cot * causal_ot_loss
+            + w_current * current_match_loss
         )
 
         logs = {
@@ -436,10 +759,20 @@ class LoBiFlow(RectifiedFlowLOB):
             "physics": float(imbalance_loss.detach().cpu()),
             "consistency": float(consistency_loss.detach().cpu()),
             "consistency_steps": float(consistency_steps),
+            "causal_ot": float(causal_ot_loss.detach().cpu()),
+            "causal_ot_horizon": float(0 if fut_target is None else min(int(fut_target.shape[1]), self._causal_ot_horizon())),
+            "causal_ot_k_neighbors": float(self._causal_ot_k_neighbors()),
+            "causal_ot_rollout_nfe": float(self._causal_ot_rollout_nfe()),
+            "current_match": float(current_match_loss.detach().cpu()),
+            "current_match_horizon": float(0 if fut_target is None else min(int(fut_target.shape[1]), self._current_match_horizon())),
+            "current_match_k_neighbors": float(self._current_match_k_neighbors()),
+            "current_match_rollout_nfe": float(self._current_match_rollout_nfe()),
             "ot_cost": float(ot_cost.detach().cpu()),
             "ot_used": float(bool(self.cfg.fm.use_minibatch_ot and batch_size > 1)),
             "loss": float(total.detach().cpu()),
         }
+        logs.update(causal_ot_logs)
+        logs.update(current_match_logs)
         return total, logs
 
     @torch.no_grad()
