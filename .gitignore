@@ -6,9 +6,9 @@ __pycache__/
 .pytest_cache/
 
 # Local prepared datasets are intentionally not committed.
-scripts/data_cryptos/
-scripts/data_databento/
-scripts/data_optiver/
+data/cryptos/
+data/databento/
+data/optiver/
 
 # Scratch experiment outputs are ignored by default. Curated paper artifacts
 # below remain trackable.
