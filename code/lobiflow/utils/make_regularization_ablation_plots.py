@@ -226,7 +226,7 @@ def plot_training_delta_20k(summary: dict) -> None:
 
 def plot_regularization_ablation_2x2_pdf(summary: dict) -> None:
     with plt.rc_context(PUBLICATION_RC):
-        fig, axes = plt.subplots(2, 2, figsize=(15.8, 11.4), constrained_layout=True)
+        fig, axes = plt.subplots(2, 2, figsize=(15.8, 6.8), constrained_layout=True)
         ax_causal_app, ax_current_app = axes[0]
         ax_causal_curve, ax_current_curve = axes[1]
 
@@ -240,7 +240,7 @@ def plot_regularization_ablation_2x2_pdf(summary: dict) -> None:
         )
         style_axes(ax_causal_app)
         ax_causal_app.set_xlabel("Local/global future dispersion ratio (lower is better)")
-        ax_causal_app.set_ylabel("Neighborhood instability k vs 2k (lower is better)")
+        ax_causal_app.set_ylabel("Neighborhood instability (k vs 2k)")
 
         training_rows = _training_curve_rows(summary)
         for dataset in training_rows:
@@ -257,7 +257,7 @@ def plot_regularization_ablation_2x2_pdf(summary: dict) -> None:
         ax_causal_curve.axhline(0.0, color="#333333", linewidth=1.0, linestyle="--", alpha=0.7)
         style_axes(ax_causal_curve)
         ax_causal_curve.set_xlabel("Training steps")
-        ax_causal_curve.set_ylabel("Delta score_main vs FM baseline")
+        ax_causal_curve.set_ylabel("Delta score_main vs FM")
         ax_causal_curve.legend(frameon=False)
 
         annotate_points(
@@ -270,7 +270,7 @@ def plot_regularization_ablation_2x2_pdf(summary: dict) -> None:
         )
         style_axes(ax_current_app)
         ax_current_app.set_xlabel("Predictable current share (higher is better)")
-        ax_current_app.set_ylabel("Neighborhood instability k vs 2k (lower is better)")
+        ax_current_app.set_ylabel("Neighborhood instability (k vs 2k)")
 
         if training_rows:
             for dataset in training_rows:
@@ -298,7 +298,7 @@ def plot_regularization_ablation_2x2_pdf(summary: dict) -> None:
         ax_current_curve.axhline(0.0, color="#333333", linewidth=1.0, linestyle="--", alpha=0.7)
         style_axes(ax_current_curve)
         ax_current_curve.set_xlabel("Training steps")
-        ax_current_curve.set_ylabel("Delta score_main vs FM baseline")
+        ax_current_curve.set_ylabel("Delta score_main vs FM")
         ax_current_curve.legend(frameon=False)
 
         fig.savefig(
