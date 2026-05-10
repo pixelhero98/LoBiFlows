@@ -152,7 +152,7 @@ Published paper-ready quality presets:
 
 - `synthetic`: `transformer`, `history_len=128`, `solver=euler`, `eval_nfe=2`
 - `optiver`: `transformer`, `history_len=128`, `solver=dpmpp2m`, `eval_nfe=4`
-- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=1`
+- `cryptos`: `hybrid`, `history_len=256`, `solver=dpmpp2m`, `eval_nfe=2`
 - `es_mbp_10`: `hybrid`, `history_len=256`, `solver=euler`, `eval_nfe=1`
 
 ## Final Outputs

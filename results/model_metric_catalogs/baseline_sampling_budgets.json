@@ -1,0 +1,42 @@
+{
+  "description": "Evaluation sampling budgets used for non-LoBiFlow baseline rows in the efficiency tradeoff table.",
+  "semantics": {
+    "TRADES": "Selected denoising-step budget from strict baseline tuning.",
+    "CGAN": "One generator evaluation; the sampler ignores iterative step count.",
+    "TimeCausalVAE": "One prior-sample decoder evaluation; the sampler ignores iterative step count.",
+    "TimeGAN": "One generator/recovery evaluation; the sampler ignores iterative step count.",
+    "KoVAE": "One Koopman-prior decoder evaluation; the sampler ignores iterative step count."
+  },
+  "budgets": {
+    "TRADES": {
+      "synthetic": 4,
+      "optiver": 4,
+      "cryptos": 8,
+      "es_mbp_10": 4
+    },
+    "CGAN": {
+      "synthetic": 1,
+      "optiver": 1,
+      "cryptos": 1,
+      "es_mbp_10": 1
+    },
+    "TimeCausalVAE": {
+      "synthetic": 1,
+      "optiver": 1,
+      "cryptos": 1,
+      "es_mbp_10": 1
+    },
+    "TimeGAN": {
+      "synthetic": 1,
+      "optiver": 1,
+      "cryptos": 1,
+      "es_mbp_10": 1
+    },
+    "KoVAE": {
+      "synthetic": 1,
+      "optiver": 1,
+      "cryptos": 1,
+      "es_mbp_10": 1
+    }
+  }
+}

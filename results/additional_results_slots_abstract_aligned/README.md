@@ -9,5 +9,6 @@ Generated artifacts for the alternative three-slot layout aligned to the current
 Sources:
 
 - `results/model_metric_catalogs/all_models_metric_catalog.json`
+- `results/model_metric_catalogs/baseline_sampling_budgets.json`
 - `results/benchmark_lobiflow_paper_ready/overall_summary.json`
 - `results/regularization_ablation/structured_conditional_regularization_ablation.json`

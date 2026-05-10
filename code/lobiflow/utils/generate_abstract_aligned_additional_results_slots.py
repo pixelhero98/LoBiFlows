@@ -17,6 +17,11 @@ MERGED_CATALOG_PATH = (
     / "results" / "model_metric_catalogs"
     / "all_models_metric_catalog.json"
 )
+BASELINE_SAMPLING_BUDGETS_PATH = (
+    REPO_ROOT
+    / "results" / "model_metric_catalogs"
+    / "baseline_sampling_budgets.json"
+)
 PAPER_READY_SUMMARY_PATH = (
     REPO_ROOT
     / "results" / "benchmark_lobiflow_paper_ready"
@@ -145,7 +150,7 @@ def _scatter_annotate(ax, x: float, y: float, label: str, x_min: float, x_max: f
         )
 
 
-def _build_efficiency_table(catalog_rows: list[dict], summary: dict) -> str:
+def _build_efficiency_table(catalog_rows: list[dict], summary: dict, baseline_sampling_budgets: dict) -> str:
     lookup: dict[tuple[str, str, str, str], dict] = {}
     for row in catalog_rows:
         lookup[(row["section"], row["variant"], row["dataset"], row["metric"])] = row
@@ -189,17 +194,19 @@ def _build_efficiency_table(catalog_rows: list[dict], summary: dict) -> str:
             elif section == "speed":
                 nfe = str(summary["results"]["speed"][dataset]["speed_preset"]["eval_nfe"])
             else:
-                nfe = "--"
+                nfe = str(baseline_sampling_budgets["budgets"][label][dataset])
             cells.extend([score_text, ms_text, nfe])
         body.append(f"{label} & " + " & ".join(cells) + r" \\")
 
     body.extend([r"\bottomrule", r"\end{tabular}%"])
     caption = (
         "Performance-efficiency tradeoff for the published LoBiFlow quality and speed presets and all baselines. "
-        "Scores are macro-over-horizon test means; lower is better. NFE is reported for the LoBiFlow presets only."
+        "Scores are macro-over-horizon test means; lower is better. "
+        "NFE reports the evaluation sampling budget; one-pass baselines use NFE=1."
     )
     return (
-        "% Generated from results/model_metric_catalogs/all_models_metric_catalog.json and "
+        "% Generated from results/model_metric_catalogs/all_models_metric_catalog.json, "
+        "results/model_metric_catalogs/baseline_sampling_budgets.json, and "
         "results/benchmark_lobiflow_paper_ready/overall_summary.json; do not hand-edit.\n"
         + _latex_table(caption, "tab:efficiency-tradeoff", body, wide=True)
     )
@@ -343,9 +350,9 @@ def _write_readme() -> None:
             "Sources:",
             "",
             "- `results/model_metric_catalogs/all_models_metric_catalog.json`",
+            "- `results/model_metric_catalogs/baseline_sampling_budgets.json`",
             "- `results/benchmark_lobiflow_paper_ready/overall_summary.json`",
             "- `results/regularization_ablation/structured_conditional_regularization_ablation.json`",
-            "",
         ]
     )
     README_PATH.write_text(text + "\n", encoding="utf-8")
@@ -373,10 +380,14 @@ def main() -> None:
     args = build_argparser().parse_args()
     OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
     merged_catalog = _load_json(MERGED_CATALOG_PATH)
+    baseline_sampling_budgets = _load_json(BASELINE_SAMPLING_BUDGETS_PATH)
     paper_summary = _load_json(PAPER_READY_SUMMARY_PATH)
     reg_json = _load_json(REG_ABLATION_JSON_PATH)
 
-    EFFICIENCY_TABLE_PATH.write_text(_build_efficiency_table(merged_catalog, paper_summary), encoding="utf-8")
+    EFFICIENCY_TABLE_PATH.write_text(
+        _build_efficiency_table(merged_catalog, paper_summary, baseline_sampling_budgets),
+        encoding="utf-8",
+    )
     causal_tex, _ = _make_causal_ot_figure(reg_json)
     current_tex, _ = _make_current_matching_figure(reg_json)
     CAUSAL_OT_TEX_PATH.write_text(causal_tex, encoding="utf-8")
