@@ -1,0 +1,22 @@
+% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json; do not hand-edit.
+\begin{table*}[t]
+\centering
+\caption{Main benchmark results using macro-over-horizon test metrics. Values are mean$\pm$std over seeds. Results are macro-averaged over the benchmark rollout horizons defined per dataset. Best per dataset/metric in bold.}
+\label{tab:main-benchmark}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{3}{c}{Synthetic} & \multicolumn{3}{c}{Optiver} & \multicolumn{3}{c}{Cryptos} & \multicolumn{3}{c}{ES-MBP-10} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}
+ & Score $\downarrow$ & TSTR $\uparrow$ & C-W1 $\downarrow$ & Score $\downarrow$ & TSTR $\uparrow$ & C-W1 $\downarrow$ & Score $\downarrow$ & TSTR $\uparrow$ & C-W1 $\downarrow$ & Score $\downarrow$ & TSTR $\uparrow$ & C-W1 $\downarrow$ \\
+\midrule
+LoBiFlow & \textbf{0.37$\pm$0.01} & \textbf{0.43$\pm$0.02} & \textbf{0.34$\pm$0.02} & \textbf{0.36$\pm$0.01} & 0.30$\pm$0.03 & \textbf{0.51$\pm$0.02} & \textbf{1.83$\pm$0.11} & 0.16$\pm$0.01 & \textbf{60.92$\pm$25.41} & \textbf{0.46$\pm$0.01} & \textbf{0.34$\pm$0.02} & \textbf{0.42$\pm$0.03} \\
+TRADES & 0.61$\pm$0.03 & 0.29$\pm$0.03 & 1.00$\pm$0.13 & 0.44$\pm$0.02 & 0.28$\pm$0.02 & 0.74$\pm$0.04 & 3.00$\pm$0.25 & 0.18$\pm$0.02 & 634.67$\pm$233.51 & 0.57$\pm$0.02 & 0.28$\pm$0.02 & 0.76$\pm$0.05 \\
+CGAN & 0.53$\pm$0.10 & -- & 0.86$\pm$0.32 & 0.45$\pm$0.02 & 0.25$\pm$0.03 & 0.62$\pm$0.03 & 2.19$\pm$0.36 & \textbf{0.20$\pm$0.00} & 92.28$\pm$56.64 & 0.61$\pm$0.08 & 0.22$\pm$0.03 & 0.96$\pm$0.32 \\
+TimeCausalVAE & 0.65$\pm$0.09 & 0.42$\pm$0.03 & 1.61$\pm$0.59 & 0.43$\pm$0.01 & 0.29$\pm$0.01 & 0.64$\pm$0.03 & 2.31$\pm$0.37 & 0.18$\pm$0.01 & 139.14$\pm$82.67 & 0.55$\pm$0.05 & 0.28$\pm$0.03 & 0.70$\pm$0.17 \\
+TimeGAN & 0.51$\pm$0.00 & 0.27$\pm$0.02 & 0.56$\pm$0.02 & 0.54$\pm$0.01 & 0.29$\pm$0.01 & 0.87$\pm$0.02 & 3.10$\pm$0.85 & 0.15$\pm$0.01 & 2445.90$\pm$4244.13 & 0.63$\pm$0.06 & 0.24$\pm$0.04 & 0.96$\pm$0.18 \\
+KoVAE & 0.52$\pm$0.07 & 0.42$\pm$0.02 & 0.94$\pm$0.38 & 0.40$\pm$0.01 & \textbf{0.31$\pm$0.03} & 0.59$\pm$0.03 & 2.21$\pm$0.52 & 0.17$\pm$0.02 & 109.95$\pm$63.92 & 0.58$\pm$0.06 & 0.26$\pm$0.03 & 0.78$\pm$0.23 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}

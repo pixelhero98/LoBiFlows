@@ -1,0 +1,881 @@
+{
+  "dataset": "optiver",
+  "anchor": "transformer_ctx_transformer_field",
+  "challenger": "transformer_ctx_resmlp_field",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "train_steps": 12000,
+  "quality_nfe_preset": 4,
+  "nfe_list": [
+    1,
+    2,
+    4
+  ],
+  "variants": {
+    "transformer_ctx_transformer_field": {
+      "notes": "Current Optiver anchor.",
+      "aggregate": {
+        "by_nfe": {
+          "1": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.4564912982832439,
+                "std": 0.008660097127788261,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.336744134408987,
+                "std": 0.016573237074003936,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.44054603695724043,
+                "std": 0.006125508324813108,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.4137559197371123,
+                "std": 0.017380822042341343,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.45659411336275907,
+                "std": 0.021708343752456262,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.6063333333333333,
+                "std": 0.035178973623248094,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.0481962977327741,
+                "std": 0.02004051207106468,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.2793552008739912,
+                "std": 0.0657947851522995,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.0733757138837143,
+                "std": 0.01755908557392969,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.1282048693768091,
+                "std": 0.006242465456631925,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.2851577454826997,
+                "std": 0.1627025468737496,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 1081.367893372145,
+                "std": 19.664281610512184,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 1.0852369857486337,
+                "std": 0.01933779703754653,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.0006753923496148331,
+                "std": 0.000302943546458018,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 1085.2369857486337,
+                "std": 19.337797037546515,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 5.426184928743169,
+                "std": 0.09668898518773257,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 184.34934968728086,
+                "std": 3.244039599839058,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          },
+          "2": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.37926015577703054,
+                "std": 0.015451124979261282,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.3352948572399854,
+                "std": 0.02795068431962703,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.23751638680847667,
+                "std": 0.015026686017014403,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.2957525076724694,
+                "std": 0.03258887612030493,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.42807978954866704,
+                "std": 0.034182819256569456,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.3668611111111111,
+                "std": 0.03687920304567269,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.2308527269645655,
+                "std": 0.03442279352285684,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.501098023312465,
+                "std": 0.05919237233236449,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.2139246185722508,
+                "std": 0.006084669265667204,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.11555600779560134,
+                "std": 0.003664840294683044,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.6717390084202999,
+                "std": 0.2450973919021209,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 1965.413587760284,
+                "std": 30.1758583221734,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 1.9684058205690238,
+                "std": 0.028586634119352534,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.0014899829990946843,
+                "std": 0.0005579806559192775,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 1968.4058205690235,
+                "std": 28.58663411935259,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 9.842029102845117,
+                "std": 0.14293317059676322,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 101.62630121977554,
+                "std": 1.4623354364526808,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 2.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          },
+          "4": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.3466148804334699,
+                "std": 0.015908607435037424,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.35171757457955116,
+                "std": 0.026501374513827905,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.2098030163127116,
+                "std": 0.01591004762639278,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.23465015159544111,
+                "std": 0.021506818960500527,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.3742700943990261,
+                "std": 0.0264159040374875,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.3047222222222222,
+                "std": 0.029621871090692087,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.232443370761626,
+                "std": 0.03471230883417818,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.5408985700866893,
+                "std": 0.024795618026812825,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.2512735610842567,
+                "std": 0.022685584778371008,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.12852048817096742,
+                "std": 0.006184155881724848,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.7556743033660442,
+                "std": 0.08774028210653229,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 3731.9028921632307,
+                "std": 55.510655712936476,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 3.733739469355593,
+                "std": 0.051808231867038014,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.0014452198517396913,
+                "std": 0.00047087723638525054,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 3733.739469355593,
+                "std": 51.80823186703804,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 18.668697346777964,
+                "std": 0.2590411593351902,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 53.5758670999467,
+                "std": 0.7398630363150194,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 4.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          }
+        }
+      }
+    },
+    "transformer_ctx_resmlp_field": {
+      "notes": "Keep transformer context, replace the field network with a residual MLP.",
+      "aggregate": {
+        "by_nfe": {
+          "1": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.4089173619811888,
+                "std": 0.004711435075611073,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.3258515611252362,
+                "std": 0.00480883873438473,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.34090204393374596,
+                "std": 0.003804958668647754,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.29842000414846187,
+                "std": 0.014213789074787956,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.4327724676319242,
+                "std": 0.01816456638765132,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.4471388888888889,
+                "std": 0.01707016204078819,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.2352275292582657,
+                "std": 0.01848770771343554,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.5755324108539686,
+                "std": 0.04513750167133162,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.162003274736824,
+                "std": 0.008120842382796197,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.12142215609687945,
+                "std": 0.0023092626339122862,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.480842378938622,
+                "std": 0.05452803028260151,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 482.6171437692312,
+                "std": 0.38136597175745746,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 0.48283845804010833,
+                "std": 0.00028865157453126876,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.00022036007196800196,
+                "std": 1.6896321090168043e-05,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 482.83845804010826,
+                "std": 0.2886515745312606,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 2.4141922902005413,
+                "std": 0.0014432578726563032,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 414.21736023250605,
+                "std": 0.24773156906336183,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          },
+          "2": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.3864057533091066,
+                "std": 0.02186240920996987,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.3259420971014629,
+                "std": 0.03169778324869921,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.25367110107953444,
+                "std": 0.031071515604593834,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.27587265421335155,
+                "std": 0.035558405700833136,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.4549780414637577,
+                "std": 0.03757423522433702,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.3743888888888889,
+                "std": 0.036211590975648335,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.3312166784661492,
+                "std": 0.03496652131629145,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.6672802997889822,
+                "std": 0.07821872603953989,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.2380965717477974,
+                "std": 0.021393773250065855,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.11356214234530991,
+                "std": 0.005103040624006568,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.7635023050126684,
+                "std": 0.2332109750091994,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 766.1536503557323,
+                "std": 0.09290637456583396,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 0.7662962377847483,
+                "std": 0.0006728926574273432,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.0006122339927338555,
+                "std": 2.3728840737726027e-05,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 766.2962377847483,
+                "std": 0.6728926574273284,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 3.8314811889237412,
+                "std": 0.003364463287136642,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 260.99587121087285,
+                "std": 0.2291394768445717,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 2.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          },
+          "4": {
+            "metrics": {
+              "score_main": {
+                "mean": 0.36071127966373323,
+                "std": 0.009863580591525282,
+                "n": 3,
+                "n_valid": 3
+              },
+              "tstr_macro_f1": {
+                "mean": 0.32904955733912455,
+                "std": 0.00817741236352442,
+                "n": 3,
+                "n_valid": 3
+              },
+              "disc_auc_gap": {
+                "mean": 0.23420129270544784,
+                "std": 0.0179879308951283,
+                "n": 3,
+                "n_valid": 3
+              },
+              "unconditional_w1": {
+                "mean": 0.22594387224225154,
+                "std": 0.01660116832266919,
+                "n": 3,
+                "n_valid": 3
+              },
+              "conditional_w1": {
+                "mean": 0.3969429305565142,
+                "std": 0.028909940858878453,
+                "n": 3,
+                "n_valid": 3
+              },
+              "u_l1": {
+                "mean": 0.31288888888888894,
+                "std": 0.0242281147266946,
+                "n": 3,
+                "n_valid": 3
+              },
+              "c_l1": {
+                "mean": 1.3111002138248455,
+                "std": 0.03918343581144873,
+                "n": 3,
+                "n_valid": 3
+              },
+              "spread_specific_error": {
+                "mean": 1.651193791811054,
+                "std": 0.03008522558631414,
+                "n": 3,
+                "n_valid": 3
+              },
+              "imbalance_specific_error": {
+                "mean": 1.2654672450579418,
+                "std": 0.0208783446526902,
+                "n": 3,
+                "n_valid": 3
+              },
+              "ret_vol_acf_error": {
+                "mean": 0.1292878332279456,
+                "std": 0.0043102551300723295,
+                "n": 3,
+                "n_valid": 3
+              },
+              "impact_response_error": {
+                "mean": 1.7336463412765966,
+                "std": 0.14200656560126126,
+                "n": 3,
+                "n_valid": 3
+              },
+              "efficiency_ms_per_sample": {
+                "mean": 1331.852659634832,
+                "std": 1.6106273714569022,
+                "n": 3,
+                "n_valid": 3
+              }
+            },
+            "latency": {
+              "latency_s_mean": {
+                "mean": 1.3332431787935395,
+                "std": 0.0020871743867468904,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_s_std": {
+                "mean": 0.0006804447476967608,
+                "std": 0.00020942004170063167,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_sample_mean": {
+                "mean": 1333.2431787935395,
+                "std": 2.0871743867469186,
+                "n": 3,
+                "n_valid": 3
+              },
+              "latency_ms_per_step_mean": {
+                "mean": 6.666215893967698,
+                "std": 0.010435871933734592,
+                "n": 3,
+                "n_valid": 3
+              },
+              "throughput_steps_per_s_mean": {
+                "mean": 150.01051094408757,
+                "std": 0.2349893436573476,
+                "n": 3,
+                "n_valid": 3
+              },
+              "n_trials": {
+                "mean": 5.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "warmup": {
+                "mean": 1.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "nfe": {
+                "mean": 4.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "horizon": {
+                "mean": 200.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              },
+              "context_len": {
+                "mean": 128.0,
+                "std": 0.0,
+                "n": 3,
+                "n_valid": 3
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "comparison": {
+    "1": {
+      "score_main_delta": -0.04757393630205514,
+      "conditional_w1_delta": -0.023821645730834895,
+      "latency_ms_per_sample_delta": -602.3985277085255,
+      "latency_speedup_vs_anchor": 2.247619193702432
+    },
+    "2": {
+      "score_main_delta": 0.007145597532076053,
+      "conditional_w1_delta": 0.026898251915090654,
+      "latency_ms_per_sample_delta": -1202.109582784275,
+      "latency_speedup_vs_anchor": 2.568726979867995
+    },
+    "4": {
+      "score_main_delta": 0.014096399230263346,
+      "conditional_w1_delta": 0.022672836157488108,
+      "latency_ms_per_sample_delta": -2400.496290562053,
+      "latency_speedup_vs_anchor": 2.8004939599498107
+    }
+  }
+}

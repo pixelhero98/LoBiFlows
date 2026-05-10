@@ -1,0 +1,20 @@
+% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json; do not hand-edit.
+\begin{table}[t]
+\centering
+\caption{Internal LoBiFlow variant ablation using macro-over-horizon test means. Lower is better for both metrics. The published LoBiFlow presets are justified by this quality--efficiency tradeoff across datasets.}
+\label{tab:lobiflow-variant-ablation}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lcccccccc}
+\toprule
+\multirow{2}{*}{Variant} & \multicolumn{2}{c}{Synthetic} & \multicolumn{2}{c}{Optiver} & \multicolumn{2}{c}{Cryptos} & \multicolumn{2}{c}{ES-MBP-10} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+ & Score $\downarrow$ & ms/sample $\downarrow$ & Score $\downarrow$ & ms/sample $\downarrow$ & Score $\downarrow$ & ms/sample $\downarrow$ & Score $\downarrow$ & ms/sample $\downarrow$ \\
+\midrule
+LoBiFlow & 0.371 & 2547 & \textbf{0.360} & 770 & 1.830 & 5245 & \textbf{0.457} & 2516 \\
+Speed & 0.405 & \textbf{1279} & 0.413 & \textbf{193} & 1.714 & \textbf{2615} & 0.459 & 2519 \\
+Transformer & \textbf{0.371} & 2544 & 0.363 & 768 & 2.122 & 4902 & 0.483 & \textbf{2376} \\
+Hybrid & 0.373 & 2679 & 0.361 & 813 & \textbf{1.497} & 5184 & 0.460 & 2491 \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}

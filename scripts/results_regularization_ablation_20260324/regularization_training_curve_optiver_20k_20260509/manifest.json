@@ -1,0 +1,30 @@
+{
+  "dataset": "optiver",
+  "seeds": [
+    0,
+    1,
+    2
+  ],
+  "checkpoints": [
+    1000,
+    2000,
+    4000,
+    8000,
+    12000,
+    16000,
+    20000
+  ],
+  "horizons": [
+    10,
+    30,
+    60
+  ],
+  "eval_windows": 24,
+  "variants": [
+    "baseline_fm",
+    "local_causal_ot",
+    "conditional_current_matching"
+  ],
+  "rows_path": "results_regularization_ablation_20260324/regularization_training_curve_optiver_20k_20260509/rows.json",
+  "summary_path": "results_regularization_ablation_20260324/regularization_training_curve_optiver_20k_20260509/summary.json"
+}

@@ -1,0 +1,23 @@
+% Generated from scripts/results_model_metric_catalogs_20260316/all_models_metric_catalog.json and scripts/results_benchmark_lobiflow_paper_ready_20260315/overall_summary.json; do not hand-edit.
+\begin{table*}[t]
+\centering
+\caption{Performance-efficiency tradeoff for the published LoBiFlow quality and speed presets and all baselines. Scores are macro-over-horizon test means; lower is better. NFE is reported for the LoBiFlow presets only.}
+\label{tab:efficiency-tradeoff}
+\resizebox{\textwidth}{!}{%
+\begin{tabular}{lcccccccccccc}
+\toprule
+\multirow{2}{*}{Method} & \multicolumn{3}{c}{Synthetic} & \multicolumn{3}{c}{Optiver} & \multicolumn{3}{c}{Cryptos} & \multicolumn{3}{c}{ES-MBP-10} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}\cmidrule(lr){11-13}
+ & Score $\downarrow$ & ms/sample $\downarrow$ & NFE & Score $\downarrow$ & ms/sample $\downarrow$ & NFE & Score $\downarrow$ & ms/sample $\downarrow$ & NFE & Score $\downarrow$ & ms/sample $\downarrow$ & NFE \\
+\midrule
+LoBiFlow-Q & \textbf{0.37} & 2547 & 2 & \textbf{0.36} & 770 & 4 & 1.83 & 5245 & 2 & \textbf{0.46} & 2516 & 1 \\
+LoBiFlow-S & 0.41 & 1279 & 1 & 0.41 & 193 & 1 & \textbf{1.71} & 2615 & 1 & 0.46 & 2519 & 1 \\
+TRADES & 0.61 & 755 & -- & 0.44 & 110 & -- & 3.00 & 2633 & -- & 0.57 & 1315 & -- \\
+CGAN & 0.53 & \textbf{140} & -- & 0.45 & \textbf{21} & -- & 2.19 & \textbf{266} & -- & 0.61 & \textbf{269} & -- \\
+TimeCausalVAE & 0.65 & 249 & -- & 0.43 & 37 & -- & 2.31 & 460 & -- & 0.55 & 468 & -- \\
+TimeGAN & 0.51 & 314 & -- & 0.54 & 48 & -- & 3.10 & 586 & -- & 0.63 & 575 & -- \\
+KoVAE & 0.52 & 509 & -- & 0.40 & 57 & -- & 2.21 & 734 & -- & 0.58 & 734 & -- \\
+\bottomrule
+\end{tabular}%
+}
+\end{table*}

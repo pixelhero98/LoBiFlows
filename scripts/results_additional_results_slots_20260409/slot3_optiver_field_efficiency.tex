@@ -1,0 +1,18 @@
+% Generated from scripts/results_optiver_resmlp_confirm_20260331/overall_summary.json; do not hand-edit.
+\begin{table}[t]
+\centering
+\caption{Optiver efficiency path from a lighter velocity field. Numbers are 3-seed means; lower is better for all metrics. A ResMLP field gives a substantial speedup while remaining competitive with the transformer-field anchor.}
+\label{tab:optiver-resmlp-efficiency}
+\resizebox{\columnwidth}{!}{%
+\begin{tabular}{lccccccccc}
+\toprule
+\multirow{2}{*}{Field} & \multicolumn{3}{c}{NFE=1} & \multicolumn{3}{c}{NFE=2} & \multicolumn{3}{c}{NFE=4} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+ & Score $\downarrow$ & C-W1 $\downarrow$ & ms/sample $\downarrow$ & Score $\downarrow$ & C-W1 $\downarrow$ & ms/sample $\downarrow$ & Score $\downarrow$ & C-W1 $\downarrow$ & ms/sample $\downarrow$ \\
+\midrule
+Transformer field & 0.456 & 0.457 & 1085 & \textbf{0.379} & \textbf{0.428} & 1968 & \textbf{0.347} & \textbf{0.374} & 3734 \\
+ResMLP field & \textbf{0.409} & \textbf{0.433} & \textbf{483} & 0.386 & 0.455 & \textbf{766} & 0.361 & 0.397 & \textbf{1333} \\
+\bottomrule
+\end{tabular}%
+}
+\end{table}
